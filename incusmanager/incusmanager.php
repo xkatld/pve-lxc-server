@@ -8,7 +8,7 @@ function incusmanager_MetaData()
     return [
         'DisplayName' => 'Incus Manager (via Flask)',
         'APIVersion' => '1.1',
-        'HelpDoc' => 'https://github.com/xkatld/zjmf-server-Incus/edit/main/incusmanager'
+        'HelpDoc' => 'https://your-mofang-url.com/modules/servers/incusmanager/docs/'
     ];
 }
 
@@ -16,26 +16,28 @@ function incusmanager_ConfigOptions()
 {
     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, [], null, null, null);
     return [
-        'Container Name Prefix' => [
-            'Type' => 'text',
-            'DisplayName' => '容器名称前缀',
-            'Description' => '用于自动生成 Incus 容器名称的前缀 (建议包含 {hostid})',
-            'Default' => 'whmcs-{hostid}',
-            'Required' => true,
+        1 => [
+            'type' => 'text',
+            'name' => 'Container Name Prefix',
+            'placeholder' => '例如: whmcs-{hostid}',
+            'description' => '用于自动生成 Incus 容器名称的前缀 (建议包含 {hostid})',
+            'default' => 'whmcs-{hostid}',
+            'key' => 'container_name_prefix',
         ],
-        'Image Identifier' => [
-            'Type' => 'text',
-            'DisplayName' => '镜像标识符',
-            'Description' => '用于创建容器的 Incus 镜像名称或别名 (如 ubuntu/20.04, images:centos/7)',
-            'Default' => 'ubuntu/20.04',
-            'Required' => true,
+        2 => [
+            'type' => 'text',
+            'name' => 'Image Identifier',
+            'placeholder' => '例如: ubuntu/20.04',
+            'description' => '用于创建容器的 Incus 镜像名称或别名 (如 ubuntu/20.04, images:centos/7)',
+            'default' => 'ubuntu/20.04',
+            'key' => 'image_identifier',
         ],
     ];
 }
 
 function incusmanager_generateContainerName(array $params)
 {
-    $prefix_template = $params['configoption1'];
+    $prefix_template = $params['configoptions']['container_name_prefix'];
     $hostid = $params['hostid'];
     $productid = $params['productid'];
     $uid = $params['uid'];
@@ -131,7 +133,7 @@ function incusmanager_CreateAccount(array $params)
     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, null, null);
 
     $container_name = incusmanager_generateContainerName($params);
-    $image_identifier = $params['configoption2'];
+    $image_identifier = $params['configoptions']['image_identifier'];
 
     if (empty($container_name) || empty($image_identifier)) {
         return ['status' => 'error', 'msg' => '模块配置错误: 容器名称或镜像标识符未设置。'];
@@ -217,14 +219,27 @@ function incusmanager_ChangePackage(array $params)
     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, null, null);
     $container_name = incusmanager_generateContainerName($params);
 
-    $old_image = $params['old_configoptions']['Image Identifier'];
-    $new_image = $params['configoption2'];
+    $old_image = $params['old_configoptions']['image_identifier'];
+    $new_image = $params['configoptions']['image_identifier'];
 
     $message = "容器 {$container_name} 的升降级操作。旧镜像: {$old_image}, 新镜像: {$new_image}. Flask 应用当前不支持直接升降级修改资源或更换镜像。";
     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, "Warning: " . $message, null, null);
 
     return ['status' => 'success', 'msg' => $message . ' 请手动检查 Incus 容器状态。'];
 }
+
+function incusmanager_CreateTicket($params) {
+     // Flask app does not have this functionality
+     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, "CreateTicket not implemented", null);
+     return ['status' => 'error', 'msg' => '此功能未实现'];
+}
+
+function incusmanager_ReplyTicket($params) {
+     // Flask app does not have this functionality
+     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, "ReplyTicket not implemented", null);
+     return ['status' => 'error', 'msg' => '此功能未实现'];
+}
+
 
 function incusmanager_On(array $params)
 {
@@ -286,6 +301,24 @@ function incusmanager_HardReboot(array $params)
     return incusmanager_Reboot($params);
 }
 
+function incusmanager_Reinstall($params) {
+     // Flask app does not have this functionality
+     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, "Reinstall not implemented", null);
+     return ['status' => 'error', 'msg' => '重装系统功能未实现'];
+}
+
+function incusmanager_CrackPassword($params) {
+     // Flask app does not have this functionality
+     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, "CrackPassword not implemented", null);
+     return ['status' => 'error', 'msg' => '破解密码功能未实现'];
+}
+
+function incusmanager_RescueSystem($params) {
+     // Flask app does not have this functionality
+     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, "RescueSystem not implemented", null);
+     return ['status' => 'error', 'msg' => '救援系统功能未实现'];
+}
+
 function incusmanager_Vnc(array $params)
 {
     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, "VNC function not implemented in Flask app", null);
@@ -306,7 +339,7 @@ function incusmanager_Sync(array $params)
         $flask_ip = $container_info['ip'] ?? '';
 
         $whmcs_status_map = [
-            'Running' => 'Active',
+            'Running' => 'Active', // 魔方产品状态，非状态标识
             'Stopped' => 'Suspended',
             'Error' => 'Terminated',
             'Pending' => 'Pending',
@@ -362,6 +395,8 @@ function incusmanager_ClientAreaOutput(array $params, string $key)
                     'module_params' => $params,
                     'container_info' => $container_info,
                     'container_name' => $container_name,
+                     'MODULE_CUSTOM_API' => '', // 该模板不使用自定义API调用，但为了安全也置空
+                     'hostid' => $params['hostid'],
                 ]
             ];
         } else {
@@ -380,7 +415,7 @@ function incusmanager_ClientAreaOutput(array $params, string $key)
                     'module_params' => $params,
                     'container_name' => $container_name,
                     'nat_rules' => $nat_rules,
-                    'flask_api_url' => rtrim($params['server_host'], '/'),
+                    'MODULE_CUSTOM_API' => '/serverapi.php', // 假设魔方前台调用模块方法走这个入口
                     'hostid' => $params['hostid'],
                 ]
             ];
@@ -394,6 +429,8 @@ function incusmanager_ClientAreaOutput(array $params, string $key)
              'vars' => [
                  'module_params' => $params,
                  'container_name' => $container_name,
+                 'MODULE_CUSTOM_API' => '/serverapi.php', // 假设魔方前台调用模块方法走这个入口
+                 'hostid' => $params['hostid'],
              ]
         ];
     }
@@ -494,6 +531,7 @@ function incusmanager_DeleteNatRule(array $params)
     }
 }
 
+
 function incusmanager_Status(array $params)
 {
     logModuleCall(INCUS_MODULE_NAME, __FUNCTION__, $params, null, null, null);
@@ -505,9 +543,8 @@ function incusmanager_Status(array $params)
     if ($api_response['success']) {
         $container_info = $api_response['data'];
         $flask_status = $container_info['status'] ?? 'Unknown';
-        $flask_ip = $container_info['ip'] ?? 'N/A';
 
-        $whmcs_status_map = [
+        $mofang_status_flag_map = [
             'Running' => 'on',
             'Stopped' => 'off',
             'Error' => 'unknown',
@@ -516,9 +553,9 @@ function incusmanager_Status(array $params)
             'Stopping' => 'process',
             'Unknown' => 'unknown',
         ];
-        $whmcs_status_flag = $whmcs_status_map[$flask_status] ?? 'unknown';
+        $mofang_status_flag = $mofang_status_flag_map[$flask_status] ?? 'unknown';
 
-        $whmcs_status_des_map = [
+        $mofang_status_des_map = [
             'Running' => '开机',
             'Stopped' => '关机',
             'Error' => '错误',
@@ -527,13 +564,13 @@ function incusmanager_Status(array $params)
             'Stopping' => '停止中',
             'Unknown' => '未知状态',
         ];
-        $whmcs_status_des = $whmcs_status_des_map[$flask_status] ?? '未知状态';
+        $mofang_status_des = $mofang_status_des_map[$flask_status] ?? '未知状态';
 
         return [
             'status' => 'success',
             'data' => [
-                'status' => $whmcs_status_flag,
-                'des' => $whmcs_status_des,
+                'status' => $mofang_status_flag,
+                'des' => $mofang_status_des,
             ]
         ];
 
