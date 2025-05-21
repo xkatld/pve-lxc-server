@@ -8,7 +8,7 @@ function incusmanager_MetaData()
     return [
         'DisplayName' => 'Incus Manager (via Flask)',
         'APIVersion' => '1.1',
-        'HelpDoc' => 'https://your-whmcs.com/modules/servers/incusmanager/docs/'
+        'HelpDoc' => 'https://github.com/xkatld/zjmf-server-Incus/edit/main/incusmanager'
     ];
 }
 
