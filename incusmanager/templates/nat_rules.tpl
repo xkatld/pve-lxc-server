@@ -1,7 +1,7 @@
 <h2>容器NAT规则</h2>
 
 <h3>已有规则</h3>
-{if $nat_rules}
+{volist name="nat_rules" id="rule"}
 <table class="table">
     <thead>
         <tr>
@@ -15,7 +15,6 @@
         </tr>
     </thead>
     <tbody>
-        {foreach from=$nat_rules item=rule}
         <tr>
             <td>{$rule.id}</td>
             <td>{$rule.host_port}</td>
@@ -27,12 +26,11 @@
                 <button class="btn btn-danger btn-sm" onclick="deleteNatRule({$rule.id})">删除</button>
             </td>
         </tr>
-        {/foreach}
     </tbody>
 </table>
 {else}
 <p>该容器当前没有NAT规则。</p>
-{/if}
+{/volist}
 
 <h3>添加新规则</h3>
 <form id="addNatRuleForm">
