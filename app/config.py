@@ -15,8 +15,6 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
 
     secret_key: str = "your-secret-key-change-this"
-    
-    admin_secret: str = "PLEASE_CHANGE_THIS_DEFAULT_SECRET"
 
     class Config:
         env_file = ".env"
