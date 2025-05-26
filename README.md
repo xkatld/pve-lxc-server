@@ -5,23 +5,23 @@
 ```
 zjmf-server-pve-lxc/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py                     # FastAPI应用程序入口
-│   ├── config.py                   # 配置文件
-│   ├── database.py                 # 数据库连接配置
-│   ├── models.py                   # 数据库模型
-│   ├── schemas.py                  # Pydantic模式定义
-│   ├── auth.py                     # API Key认证
-│   ├── proxmox.py                  # Proxmox LXC服务
-│   └── api.py                      # API路由
+│   ├── __init__.py                 # Python 包标识文件
+│   ├── main.py                     # FastAPI应用主入口，处理启动、中间件和全局配置
+│   ├── config.py                   # 加载并管理项目配置（如Proxmox连接信息、数据库URL等）
+│   ├── database.py                 # 设置数据库连接（SQLAlchemy引擎和会话）
+│   ├── models.py                   # 定义数据库表结构（ApiKey 和 OperationLog）
+│   ├── schemas.py                  # 定义API数据模型（Pydantic），用于请求和响应验证
+│   ├── auth.py                     # 处理API密钥的生成、验证、权限检查及操作日志记录
+│   ├── proxmox.py                  # 封装与Proxmox API交互的逻辑，提供LXC操作服务
+│   └── api.py                      # 定义所有LXC相关的API端点（路由）
 ├── migrations/                     # 数据库迁移文件
-│   └── init.sql
-├── requirements.txt                # 项目依赖
-├── .env.example                    # 环境变量示例
-├── .env                           # 环境变量配置
+│   └── init.sql                    # 数据库初始化SQL脚本
+├── requirements.txt                # 项目所需的Python依赖库列表
+├── .env.example                    # 环境变量配置文件示例
+├── .env                           # 环境变量配置文件（需自行创建和配置）
 ├── Dockerfile                      # Docker镜像构建文件
-├── docker-compose.yml              # Docker部署配置
-└── README.md                       # 项目说明
+├── docker-compose.yml              # Docker Compose部署配置文件
+└── README.md                       # 项目说明文档
 ```
 
 ---
@@ -70,6 +70,7 @@ cd zjmf-server-pve-lxc
     ```bash
     cp .env.example .env
     ```
+   
 2.  **编辑 `.env` 文件**，使用 `nano` 或你喜欢的编辑器，填入你的 Proxmox 服务器信息和自定义配置：
     ```bash
     nano .env
@@ -86,6 +87,7 @@ cd zjmf-server-pve-lxc
 
     SECRET_KEY="这是一个强密码请务必修改" # 用于 API Key 加密等，请务必修改
     ```
+   
     编辑完成后，按 `Ctrl+X`，然后按 `Y` 保存并退出 `nano`。
 
 ### 5. 创建虚拟环境并安装项目依赖
@@ -96,15 +98,18 @@ cd zjmf-server-pve-lxc
     ```bash
     python3 -m venv venv
     ```
+   
 2.  **激活虚拟环境**：
     ```bash
     source venv/bin/activate
     ```
+   
     激活后，你的命令行提示符前会显示 `(venv)`。
 3.  **安装项目依赖**：
     ```bash
     pip install -r requirements.txt
     ```
+   
 
 ### 6. 运行项目
 
@@ -114,6 +119,7 @@ cd zjmf-server-pve-lxc
     ```bash
     uvicorn app.main:app --host 0.0.0.0 --port 8000
     ```
+   
     * `--host 0.0.0.0` 允许从任何网络接口访问服务。
     * `--port 8000` 指定服务监听的端口。
     * 如果你在开发环境中，可以添加 `--reload` 参数，这样代码变更后服务会自动重启。
