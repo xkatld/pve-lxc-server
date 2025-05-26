@@ -2,6 +2,10 @@ from proxmoxer import ProxmoxAPI
 from .config import settings
 from typing import List, Dict, Any, Optional
 import logging
+import urllib3
+
+# 添加这行代码来禁用 InsecureRequestWarning 警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
