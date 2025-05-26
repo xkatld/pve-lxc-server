@@ -1,5 +1,6 @@
 from proxmoxer import ProxmoxAPI
 from .config import settings
+from .schemas import ContainerCreate
 from typing import List, Dict, Any, Optional
 import logging
 import urllib3
@@ -131,6 +132,49 @@ class ProxmoxService:
             return {
                 'success': False,
                 'message': f'重启容器失败: {str(e)}'
+            }
+
+    def create_container(self, data: ContainerCreate) -> Dict[str, Any]:
+        try:
+            node = data.node
+            vmid = data.vmid
+
+            net_config = f"name={data.network.name},bridge={data.network.bridge},ip={data.network.ip}"
+            if data.network.gw:
+                net_config += f",gw={data.network.gw}"
+            if data.network.vlan:
+                net_config += f",tag={data.network.vlan}"
+
+            params = {
+                'vmid': vmid,
+                'ostemplate': data.ostemplate,
+                'hostname': data.hostname,
+                'password': data.password,
+                'cores': data.cores,
+                'memory': data.memory,
+                'swap': data.swap,
+                'rootfs': data.storage,
+                'net0': net_config,
+                'unprivileged': 1 if data.unprivileged else 0,
+                'start': 1 if data.start else 0,
+            }
+
+            if data.features:
+                params['features'] = data.features
+
+            result = self.proxmox.nodes(node).lxc.post(**params)
+
+            return {
+                'success': True,
+                'message': f'容器 {vmid} 创建任务已启动',
+                'task_id': result
+            }
+
+        except Exception as e:
+            logger.error(f"创建容器 {vmid} 失败: {str(e)}")
+            return {
+                'success': False,
+                'message': f'创建容器失败: {str(e)}'
             }
 
     def get_task_status(self, node: str, task_id: str) -> Dict[str, Any]:
