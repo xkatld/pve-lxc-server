@@ -1,9 +1,9 @@
-# Proxmox LXC FastAPI 后端项目结构
+# zjmf-server-pve-lxc 后端项目结构
 
 ## 项目目录结构
 
 ```
-proxmox-lxc-api/
+zjmf-server-pve-lxc/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py                     # FastAPI应用程序入口
