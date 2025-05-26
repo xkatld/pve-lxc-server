@@ -4,12 +4,23 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import logging
 import sys
+import os
+import datetime
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from .config import settings
 from .database import create_tables, get_db
 from .auth import create_api_key
 from .api import router as api_router
 from .schemas import ApiKeyCreate, ApiKeyResponse
+
+CERT_FILE = "cert.pem"
+KEY_FILE = "key.pem"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,6 +32,58 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+def generate_self_signed_cert_if_not_exists(cert_path, key_path):
+    if not os.path.exists(key_path) or not os.path.exists(cert_path):
+        logger.info("未找到证书或密钥，正在生成自签名证书...")
+
+        key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend()
+        )
+
+        with open(key_path, "wb") as f:
+            f.write(key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
+
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COUNTRY_NAME, u"CN"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"Guangdong"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, u"Shenzhen"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"ZjmfServer LTD"),
+            x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+        ])
+
+        cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            key.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.utcnow()
+        ).not_valid_after(
+            datetime.datetime.utcnow() + datetime.timedelta(days=3650)
+        ).add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(u"localhost"), x509.DNSName(u"127.0.0.1")]),
+            critical=False,
+        ).sign(key, hashes.SHA256(), default_backend())
+
+        with open(cert_path, "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+        logger.info(f"证书 '{cert_path}' 和密钥 '{key_path}' 已成功生成。")
+    else:
+        logger.info("证书和密钥已存在，跳过生成。")
+
+generate_self_signed_cert_if_not_exists(CERT_FILE, KEY_FILE)
+
 
 app = FastAPI(
     title=settings.api_title,
@@ -51,7 +114,7 @@ async def startup_event():
     logger.info("正在启动LXC管理API服务...")
     create_tables()
     logger.info("数据库表创建完成")
-    logger.info(f"API服务启动成功，访问地址: http://localhost:8000/docs")
+    logger.info(f"API服务启动成功，请通过 https://<您的IP>:8000/docs 访问")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -110,5 +173,7 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        log_level="info"
+        log_level="info",
+        ssl_keyfile=KEY_FILE,
+        ssl_certfile=CERT_FILE
     )
