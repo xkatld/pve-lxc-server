@@ -35,18 +35,22 @@ class NetworkInterface(BaseModel):
     ip: str = "dhcp"
     gw: Optional[str] = None
     vlan: Optional[int] = None
+    rate: Optional[int] = None
 
 class ContainerCreate(BaseModel):
     node: str
     vmid: int
-    ostemplate: str
     hostname: str
     password: str
+    ostemplate: str
+    storage: str
+    disk_size: int
     cores: int = 1
+    cpulimit: Optional[int] = None
     memory: int = 512
     swap: int = 512
-    storage: str
     network: NetworkInterface
+    nesting: Optional[bool] = False
     unprivileged: Optional[bool] = True
     start: Optional[bool] = False
     features: Optional[str] = None
@@ -55,11 +59,14 @@ class ContainerRebuild(BaseModel):
     ostemplate: str
     hostname: str
     password: str
+    storage: str
+    disk_size: int
     cores: int = 1
+    cpulimit: Optional[int] = None
     memory: int = 512
     swap: int = 512
-    storage: str
     network: NetworkInterface
+    nesting: Optional[bool] = False
     unprivileged: Optional[bool] = True
     start: Optional[bool] = False
     features: Optional[str] = None
