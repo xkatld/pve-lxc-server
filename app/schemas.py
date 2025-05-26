@@ -25,20 +25,6 @@ class ContainerList(BaseModel):
     containers: list[ContainerStatus]
     total: int
 
-class ApiKeyCreate(BaseModel):
-    key_name: str
-    permissions: str = "read,write"
-    expires_days: Optional[int] = None
-
-class ApiKeyResponse(BaseModel):
-    id: int
-    key_name: str
-    key_value: str
-    is_active: bool
-    created_at: datetime
-    expires_at: Optional[datetime] = None
-    permissions: str
-
 class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
