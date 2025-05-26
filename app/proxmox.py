@@ -1,5 +1,5 @@
 from proxmoxer import ProxmoxAPI
-from config import settings
+from .config import settings
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -9,7 +9,7 @@ class ProxmoxService:
     def __init__(self):
         self.proxmox = None
         self._connect()
-    
+
     def _connect(self):
         try:
             self.proxmox = ProxmoxAPI(
@@ -23,7 +23,7 @@ class ProxmoxService:
         except Exception as e:
             logger.error(f"连接Proxmox服务器失败: {str(e)}")
             raise Exception(f"无法连接到Proxmox服务器: {str(e)}")
-    
+
     def get_nodes(self) -> List[str]:
         try:
             nodes = self.proxmox.nodes.get()
@@ -31,28 +31,28 @@ class ProxmoxService:
         except Exception as e:
             logger.error(f"获取节点列表失败: {str(e)}")
             raise Exception(f"获取节点列表失败: {str(e)}")
-    
+
     def get_containers(self, node: str = None) -> List[Dict[str, Any]]:
         try:
             containers = []
             nodes = [node] if node else self.get_nodes()
-            
+
             for node_name in nodes:
                 node_containers = self.proxmox.nodes(node_name).lxc.get()
                 for container in node_containers:
                     container['node'] = node_name
                     containers.append(container)
-            
+
             return containers
         except Exception as e:
             logger.error(f"获取容器列表失败: {str(e)}")
             raise Exception(f"获取容器列表失败: {str(e)}")
-    
+
     def get_container_status(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
             status = self.proxmox.nodes(node).lxc(vmid).status.current.get()
             config = self.proxmox.nodes(node).lxc(vmid).config.get()
-            
+
             result = {
                 'vmid': vmid,
                 'node': node,
@@ -64,12 +64,12 @@ class ProxmoxService:
                 'maxmem': status.get('maxmem', 0),
                 'template': config.get('template', '0') == '1'
             }
-            
+
             return result
         except Exception as e:
             logger.error(f"获取容器{vmid}状态失败: {str(e)}")
             raise Exception(f"获取容器状态失败: {str(e)}")
-    
+
     def start_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
             result = self.proxmox.nodes(node).lxc(vmid).status.start.post()
@@ -84,7 +84,7 @@ class ProxmoxService:
                 'success': False,
                 'message': f'启动容器失败: {str(e)}'
             }
-    
+
     def stop_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
             result = self.proxmox.nodes(node).lxc(vmid).status.stop.post()
@@ -99,7 +99,7 @@ class ProxmoxService:
                 'success': False,
                 'message': f'停止容器失败: {str(e)}'
             }
-    
+
     def shutdown_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
             result = self.proxmox.nodes(node).lxc(vmid).status.shutdown.post()
@@ -114,7 +114,7 @@ class ProxmoxService:
                 'success': False,
                 'message': f'关机容器失败: {str(e)}'
             }
-    
+
     def reboot_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
             result = self.proxmox.nodes(node).lxc(vmid).status.reboot.post()
@@ -129,7 +129,7 @@ class ProxmoxService:
                 'success': False,
                 'message': f'重启容器失败: {str(e)}'
             }
-    
+
     def get_task_status(self, node: str, task_id: str) -> Dict[str, Any]:
         try:
             task = self.proxmox.nodes(node).tasks(task_id).status.get()
