@@ -12,7 +12,8 @@ services:
     volumes:
       - ./lxc_api.db:/app/lxc_api.db
       - ./lxc_api.log:/app/lxc_api.log
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+      - ./:/app 
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--ssl-keyfile", "/app/key.pem", "--ssl-certfile", "/app/cert.pem"]
 
 networks:
   default:
