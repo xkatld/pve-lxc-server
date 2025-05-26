@@ -1,4 +1,4 @@
-# zjmf-server-pve-lxc 后端项目结构
+# zjmf-server-pve-lxc 项目结构
 
 ## 项目目录结构
 
