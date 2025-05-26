@@ -4,7 +4,7 @@ from typing import List
 from .database import get_db
 from .auth import verify_api_key, log_operation
 from .proxmox import proxmox_service
-from .schemas import ContainerStatus, OperationResponse, ContainerList, ContainerCreate
+from .schemas import ContainerStatus, OperationResponse, ContainerList, ContainerCreate, ContainerRebuild
 
 router = APIRouter()
 
@@ -82,7 +82,6 @@ async def create_container(
             str(e), request.client.host
         )
         raise HTTPException(status_code=500, detail=f"创建容器失败: {str(e)}")
-
 
 @router.get("/containers/{node}/{vmid}/status", response_model=ContainerStatus, summary="获取容器状态")
 async def get_container_status(
@@ -235,6 +234,76 @@ async def reboot_container(
             str(e), request.client.host
         )
         raise HTTPException(status_code=500, detail=f"重启容器失败: {str(e)}")
+
+@router.delete("/containers/{node}/{vmid}", response_model=OperationResponse, summary="删除容器")
+async def delete_container(
+    node: str,
+    vmid: str,
+    request: Request,
+    _: bool = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    try:
+        result = proxmox_service.delete_container(node, vmid)
+
+        log_operation(
+            db, "删除容器",
+            vmid, node, "成功" if result['success'] else "失败",
+            result['message'], request.client.host
+        )
+
+        if not result['success']:
+             raise HTTPException(status_code=400, detail=result['message'])
+
+        return OperationResponse(
+            success=result['success'],
+            message=result['message'],
+            data={'task_id': result.get('task_id')} if result['success'] else None
+        )
+
+    except Exception as e:
+        log_operation(
+            db, "删除容器",
+            vmid, node, "失败",
+            str(e), request.client.host
+        )
+        raise HTTPException(status_code=500, detail=f"删除容器失败: {str(e)}")
+
+@router.post("/containers/{node}/{vmid}/rebuild", response_model=OperationResponse, summary="重建容器")
+async def rebuild_container_api(
+    node: str,
+    vmid: str,
+    rebuild_data: ContainerRebuild,
+    request: Request,
+    _: bool = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    try:
+        result = proxmox_service.rebuild_container(node, vmid, rebuild_data)
+
+        log_operation(
+            db, "重建容器",
+            vmid, node, "成功" if result['success'] else "失败",
+            result['message'], request.client.host
+        )
+
+        if not result['success']:
+             raise HTTPException(status_code=400, detail=result['message'])
+
+        return OperationResponse(
+            success=result['success'],
+            message=result['message'],
+            data={'task_id': result.get('task_id')} if result['success'] else None
+        )
+
+    except Exception as e:
+        log_operation(
+            db, "重建容器",
+            vmid, node, "失败",
+            str(e), request.client.host
+        )
+        raise HTTPException(status_code=500, detail=f"重建容器失败: {str(e)}")
+
 
 @router.get("/tasks/{node}/{task_id}", response_model=OperationResponse, summary="获取任务状态")
 async def get_task_status(
