@@ -11,10 +11,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./lxc_api.db"
 
     api_title: str = "Proxmox LXC 管理接口"
-    api_description: str = "用于管理Proxmox LXC容器的REST API服务"
+    api_description: str = "用于管理 Proxmox LXC 容器的 REST API 服务"
     api_version: str = "1.0.0"
 
-    api_key: str = "your-secret-key-change-this"
+    global_api_key: str = "请在此处设置一个强大且安全的全局API密钥"
 
     class Config:
         env_file = ".env"
