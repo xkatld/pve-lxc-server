@@ -4,7 +4,7 @@ from typing import List
 from .database import get_db
 from .auth import verify_api_key, log_operation
 from .proxmox import proxmox_service
-from .schemas import ContainerStatus, OperationResponse, ContainerList
+from .schemas import ContainerStatus, OperationResponse, ContainerList, ContainerCreate
 
 router = APIRouter()
 
@@ -48,6 +48,41 @@ async def get_containers(
             str(e), request.client.host
         )
         raise HTTPException(status_code=500, detail=f"获取容器列表失败: {str(e)}")
+
+@router.post("/containers", response_model=OperationResponse, summary="创建LXC容器")
+async def create_container(
+    container_data: ContainerCreate,
+    request: Request,
+    _: bool = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    try:
+        result = proxmox_service.create_container(container_data)
+
+        log_operation(
+            db, "创建容器",
+            str(container_data.vmid), container_data.node,
+            "成功" if result['success'] else "失败",
+            result['message'], request.client.host
+        )
+
+        if not result['success']:
+            raise HTTPException(status_code=400, detail=result['message'])
+
+        return OperationResponse(
+            success=result['success'],
+            message=result['message'],
+            data={'task_id': result.get('task_id')} if result['success'] else None
+        )
+
+    except Exception as e:
+        log_operation(
+            db, "创建容器",
+            str(container_data.vmid), container_data.node, "失败",
+            str(e), request.client.host
+        )
+        raise HTTPException(status_code=500, detail=f"创建容器失败: {str(e)}")
+
 
 @router.get("/containers/{node}/{vmid}/status", response_model=ContainerStatus, summary="获取容器状态")
 async def get_container_status(
