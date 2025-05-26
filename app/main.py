@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
 import logging
 import sys
 import os
@@ -14,10 +13,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from .config import settings
-from .database import create_tables, get_db
-from .auth import create_api_key
+from .database import create_tables
 from .api import router as api_router
-from .schemas import ApiKeyCreate, ApiKeyResponse
 
 CERT_FILE = "cert.pem"
 KEY_FILE = "key.pem"
@@ -84,7 +81,6 @@ def generate_self_signed_cert_if_not_exists(cert_path, key_path):
 
 generate_self_signed_cert_if_not_exists(CERT_FILE, KEY_FILE)
 
-
 app = FastAPI(
     title=settings.api_title,
     description=settings.api_description,
@@ -111,19 +107,19 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("正在启动LXC管理API服务...")
+    logger.info("正在启动 LXC 管理 API 服务...")
     create_tables()
     logger.info("数据库表创建完成")
-    logger.info(f"API服务启动成功，请通过 https://<您的IP>:8000/docs 访问")
+    logger.info(f"API 服务启动成功，请通过 https://<您的IP>:8000/docs 访问")
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    logger.info("LXC管理API服务正在关闭...")
+    logger.info("LXC 管理 API 服务正在关闭...")
 
 @app.get("/", summary="服务状态检查")
 async def root():
     return {
-        "service": "Proxmox LXC管理API",
+        "service": "Proxmox LXC 管理 API",
         "version": settings.api_version,
         "status": "运行中",
         "docs": "/docs"
@@ -134,37 +130,10 @@ async def health_check():
     return {
         "status": "健康",
         "service": "lxc-api",
-        "timestamp": "2024-01-01T00:00:00Z"
+        "timestamp": datetime.datetime.now().isoformat()
     }
 
-@app.post("/admin/api-keys", response_model=ApiKeyResponse, summary="创建API密钥")
-async def create_new_api_key(
-    key_data: ApiKeyCreate,
-    db: Session = Depends(get_db)
-):
-    try:
-        db_key, key_value = create_api_key(
-            db=db,
-            key_name=key_data.key_name,
-            permissions=key_data.permissions,
-            expires_days=key_data.expires_days
-        )
-
-        return ApiKeyResponse(
-            id=db_key.id,
-            key_name=db_key.key_name,
-            key_value=key_value,
-            is_active=db_key.is_active,
-            created_at=db_key.created_at,
-            expires_at=db_key.expires_at,
-            permissions=db_key.permissions
-        )
-
-    except Exception as e:
-        logger.error(f"创建API密钥失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"创建API密钥失败: {str(e)}")
-
-app.include_router(api_router, prefix="/api/v1", tags=["LXC容器管理"])
+app.include_router(api_router, prefix="/api/v1", tags=["LXC 容器管理"])
 
 if __name__ == "__main__":
     import uvicorn
