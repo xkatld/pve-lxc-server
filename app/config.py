@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     api_description: str = "用于管理Proxmox LXC容器的REST API服务"
     api_version: str = "1.0.0"
 
-    secret_key: str = "your-secret-key-change-this"
+    api_key: str = "your-secret-key-change-this"
 
     class Config:
         env_file = ".env"
