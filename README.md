@@ -1,4 +1,4 @@
-# zjmf-server-pve-lxc 项目结构
+# Proxmox LXC 管理接口 (zjmf-server-pve-lxc)
 
 ## 项目目录结构
 
@@ -19,72 +19,114 @@ zjmf-server-pve-lxc/
 ├── requirements.txt                # 项目依赖
 ├── .env.example                    # 环境变量示例
 ├── .env                           # 环境变量配置
+├── Dockerfile                      # Docker镜像构建文件
 ├── docker-compose.yml              # Docker部署配置
 └── README.md                       # 项目说明
 ```
 
-## 核心文件功能说明
+## 项目部署与运行
 
-### config.py
-管理应用程序的核心配置参数，包括数据库连接字符串、Proxmox服务器连接信息和API安全设置。配置信息通过环境变量进行管理，确保敏感信息不会硬编码在代码中。
+本项目提供了两种运行方式：使用 Docker (推荐) 或直接在本地环境运行。
 
-### database.py
-建立SQLAlchemy数据库连接会话管理。该文件负责创建数据库引擎、会话工厂和基础模型类，为整个应用程序提供统一的数据库访问接口。
+### 1. 环境准备
 
-### models.py
-定义数据库表结构，包含API Key存储表和操作日志记录表。API Key表存储密钥信息、权限范围和有效期设置，日志表记录所有LXC容器操作的详细信息。
+* **Python**: 确保你已安装 Python 3.9 或更高版本。
+* **Docker & Docker Compose**: 如果你选择使用 Docker 部署，请确保已安装 Docker 和 Docker Compose。
+* **Proxmox VE**: 你需要一个正在运行的 Proxmox VE 服务器，并准备好其 API 访问凭据。
 
-### schemas.py
-使用Pydantic定义API请求和响应的数据结构验证模式。包含LXC容器的创建请求模式、状态响应模式和通用错误响应格式，确保API数据交换的规范性和类型安全。
+### 2. 配置环境
 
-### auth.py
-实现基于自定义API Key的身份验证机制。该模块负责验证请求头中的API Key有效性，检查权限范围，并提供装饰器函数用于保护需要认证的API端点。
+首先，你需要配置项目的环境变量。
 
-### proxmox.py
-封装Proxmox VE的LXC容器管理功能。使用proxmoxer库与Proxmox API进行交互，提供容器创建、启动、停止、删除、配置修改和状态查询等核心功能。该模块处理与Proxmox服务器的连接管理和错误处理。
+1.  复制环境变量示例文件：
+    ```bash
+    cp .env.example .env
+    ```
+2.  编辑 `.env` 文件，填入你的 Proxmox 服务器信息和自定义配置：
+    ```dotenv
+    PROXMOX_HOST=你的Proxmox服务器IP
+    PROXMOX_PORT=8006
+    PROXMOX_USER=你的Proxmox用户名@pam
+    PROXMOX_PASSWORD=你的Proxmox密码
+    PROXMOX_VERIFY_SSL=False # 如果你的 PVE 没有有效证书，请设为 False
 
-### api.py
-定义所有RESTful API端点。包含LXC容器的完整生命周期管理接口，如容器列表查询、详细信息获取、创建新容器、启动和停止操作、配置更新和删除操作。每个端点都包含适当的请求验证和错误处理。
+    DATABASE_URL="sqlite:///./lxc_api.db" # 默认使用 SQLite
 
-### main.py
-FastAPI应用程序的主入口文件。初始化FastAPI应用实例，配置中间件，注册路由，设置异常处理器，并配置应用程序的启动和关闭事件处理。
+    SECRET_KEY="这是一个强密码请务必修改" # 用于 API Key 加密等，请务必修改
+    ```
 
-## 数据库设计
+### 3. 运行项目
 
-### API Keys表
-存储API密钥的核心信息，包括密钥哈希值、创建时间、最后使用时间、有效期和权限级别。支持API Key的启用和禁用状态管理，便于安全控制和访问管理。
+#### 方式一：使用 Docker (推荐)
 
-### Operation Logs表
-记录所有通过API执行的LXC操作详情。包含操作类型、目标容器ID、操作参数、执行结果、时间戳和使用的API Key信息。该设计支持操作审计和问题排查。
+这是最简单、最推荐的部署方式，可以确保环境一致性。
 
-## 主要功能模块
+1.  **构建并启动服务**: 在项目根目录下运行：
+    ```bash
+    docker-compose up --build -d
+    ```
+    * `--build` 会强制重新构建镜像，确保代码更新生效。
+    * `-d` 会让容器在后台运行。
 
-### LXC容器管理
-提供完整的LXC容器生命周期管理功能。支持基于不同模板创建容器，配置CPU、内存、存储和网络参数。实现容器的启动、停止、重启操作，以及运行状态的实时查询和监控。
+2.  **查看日志**: 如果需要查看服务运行日志，可以使用：
+    ```bash
+    docker-compose logs -f
+    ```
 
-### 配置管理
-支持容器配置的动态修改，包括资源限制调整、网络配置更新和存储空间扩展。配置变更操作会记录详细日志，确保操作的可追溯性。
+3.  **停止服务**: 如果需要停止服务，可以使用：
+    ```bash
+    docker-compose down
+    ```
 
-### 状态监控
-提供容器运行状态的实时查询接口，包括CPU使用率、内存占用、网络流量和磁盘I/O统计信息。支持批量查询多个容器的状态信息。
+#### 方式二：本地运行
 
-## 安全特性
+如果你不想使用 Docker，也可以直接在本地 Python 环境中运行。
 
-### API Key认证
-每个API请求都需要在请求头中包含有效的API Key。系统验证API Key的有效性、权限范围和过期时间，确保只有授权用户才能执行相应操作。
+1.  **创建并激活虚拟环境** (推荐):
+    ```bash
+    python -m venv venv
+    ```
+    * **Linux/macOS**: `source venv/bin/activate`
+    * **Windows**: `venv\Scripts\activate`
 
-### 操作日志记录
-所有API调用和容器操作都会记录到数据库中，包含操作时间、执行用户、操作类型和结果状态。该机制支持安全审计和问题追踪。
+2.  **安装依赖**:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-### 权限控制
-API Key支持不同的权限级别配置，可以限制某些Key只能执行查询操作，而其他Key具有完整的管理权限。这种设计确保了最小权限原则的实施。
+3.  **启动服务**:
+    ```bash
+    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ```
+    * `--reload` 参数会在代码变更时自动重启服务，适合开发环境。
 
-## 部署配置
+### 4. 访问服务
 
-### Docker支持
-项目包含完整的Docker配置文件，支持容器化部署。Docker Compose配置定义了应用程序、数据库和必要服务的完整部署栈，简化了部署和运维流程。
+服务启动后，你可以通过以下地址访问：
 
-### 环境配置
-通过环境变量管理不同环境的配置参数，支持开发、测试和生产环境的独立配置。配置文件模板确保了部署的一致性和安全性。
+* **API 根目录**: `http://127.0.0.1:8000/`
+* **API 文档 (Swagger UI)**: `http://127.0.0.1:8000/docs`
+* **API 文档 (ReDoc)**: `http://127.0.0.1:8000/redoc`
 
-该简化结构专注于LXC容器管理的核心功能，去除了不必要的复杂性，同时保持了良好的代码组织和可维护性。整个项目结构清晰明了，便于快速开发和部署。
+### 5. 创建 API 密钥
+
+为了能够访问受保护的 API 端点，你需要创建一个 API 密钥。你可以通过访问 API 文档 (`/docs`) 并使用 `/admin/api-keys` 端点来创建。
+
+1.  访问 `http://127.0.0.1:8000/docs`。
+2.  找到 `POST /admin/api-keys` 端点并展开。
+3.  点击 "Try it out"。
+4.  在请求体中输入 `key_name` (例如: "my_first_key") 和可选的 `permissions`、`expires_days`。
+5.  点击 "Execute"。
+6.  **请务必保存响应中返回的 `key_value`**，这是你访问 API 时需要使用的密钥，它**只会出现一次**。
+
+### 6. 使用 API 密钥
+
+在访问需要认证的 API 端点时，你需要在请求头中添加 `Authorization` 字段，格式为 `Bearer <你的_key_value>`。
+
+例如，使用 `curl` 获取容器列表：
+
+```bash
+curl -X GET "http://127.0.0.1:8000/api/v1/containers" \
+     -H "Authorization: Bearer <你的_key_value>" \
+     -H "accept: application/json"
+```
