@@ -93,4 +93,22 @@ async def create_new_api_key(
             key_value=key_value,
             is_active=db_key.is_active,
             created_at=db_key.created_at,
-            expires_at=db_key.expires_at
+            expires_at=db_key.expires_at,
+            permissions=db_key.permissions
+        )
+        
+    except Exception as e:
+        logger.error(f"创建API密钥失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"创建API密钥失败: {str(e)}")
+
+app.include_router(api_router, prefix="/api/v1", tags=["LXC容器管理"])
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
