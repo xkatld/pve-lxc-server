@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 from .database import get_db
-from .auth import get_current_api_key, log_operation, check_permissions
+from .auth import verify_api_key, log_operation
 from .proxmox import proxmox_service
 from .schemas import ContainerStatus, OperationResponse, ContainerList
-from .models import ApiKey
 
 router = APIRouter()
 
@@ -13,12 +12,9 @@ router = APIRouter()
 async def get_containers(
     request: Request,
     node: str = None,
-    current_key: ApiKey = Depends(get_current_api_key),
+    _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
-    if not check_permissions(current_key, "read"):
-        raise HTTPException(status_code=403, detail="权限不足")
-
     try:
         containers_data = proxmox_service.get_containers(node)
         containers = []
@@ -37,8 +33,8 @@ async def get_containers(
             containers.append(status_info)
 
         log_operation(
-            db, current_key.key_name, "获取容器列表",
-            node or "all", node or "all", "成功",
+            db, "获取容器列表",
+            node or "所有节点", node or "所有节点", "成功",
             f"获取到 {len(containers)} 个容器",
             request.client.host
         )
@@ -47,8 +43,8 @@ async def get_containers(
 
     except Exception as e:
         log_operation(
-            db, current_key.key_name, "获取容器列表",
-            node or "all", node or "all", "失败",
+            db, "获取容器列表",
+            node or "所有节点", node or "所有节点", "失败",
             str(e), request.client.host
         )
         raise HTTPException(status_code=500, detail=f"获取容器列表失败: {str(e)}")
@@ -58,17 +54,14 @@ async def get_container_status(
     node: str,
     vmid: str,
     request: Request,
-    current_key: ApiKey = Depends(get_current_api_key),
+    _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
-    if not check_permissions(current_key, "read"):
-        raise HTTPException(status_code=403, detail="权限不足")
-
     try:
         status_data = proxmox_service.get_container_status(node, vmid)
 
         log_operation(
-            db, current_key.key_name, "获取容器状态",
+            db, "获取容器状态",
             vmid, node, "成功",
             f"容器状态: {status_data['status']}",
             request.client.host
@@ -78,7 +71,7 @@ async def get_container_status(
 
     except Exception as e:
         log_operation(
-            db, current_key.key_name, "获取容器状态",
+            db, "获取容器状态",
             vmid, node, "失败",
             str(e), request.client.host
         )
@@ -89,17 +82,14 @@ async def start_container(
     node: str,
     vmid: str,
     request: Request,
-    current_key: ApiKey = Depends(get_current_api_key),
+    _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
-    if not check_permissions(current_key, "write"):
-        raise HTTPException(status_code=403, detail="权限不足")
-
     try:
         result = proxmox_service.start_container(node, vmid)
 
         log_operation(
-            db, current_key.key_name, "启动容器",
+            db, "启动容器",
             vmid, node, "成功" if result['success'] else "失败",
             result['message'], request.client.host
         )
@@ -112,7 +102,7 @@ async def start_container(
 
     except Exception as e:
         log_operation(
-            db, current_key.key_name, "启动容器",
+            db, "启动容器",
             vmid, node, "失败",
             str(e), request.client.host
         )
@@ -123,17 +113,14 @@ async def stop_container(
     node: str,
     vmid: str,
     request: Request,
-    current_key: ApiKey = Depends(get_current_api_key),
+    _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
-    if not check_permissions(current_key, "write"):
-        raise HTTPException(status_code=403, detail="权限不足")
-
     try:
         result = proxmox_service.stop_container(node, vmid)
 
         log_operation(
-            db, current_key.key_name, "强制停止容器",
+            db, "强制停止容器",
             vmid, node, "成功" if result['success'] else "失败",
             result['message'], request.client.host
         )
@@ -146,7 +133,7 @@ async def stop_container(
 
     except Exception as e:
         log_operation(
-            db, current_key.key_name, "强制停止容器",
+            db, "强制停止容器",
             vmid, node, "失败",
             str(e), request.client.host
         )
@@ -157,17 +144,14 @@ async def shutdown_container(
     node: str,
     vmid: str,
     request: Request,
-    current_key: ApiKey = Depends(get_current_api_key),
+    _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
-    if not check_permissions(current_key, "write"):
-        raise HTTPException(status_code=403, detail="权限不足")
-
     try:
         result = proxmox_service.shutdown_container(node, vmid)
 
         log_operation(
-            db, current_key.key_name, "关闭容器",
+            db, "关闭容器",
             vmid, node, "成功" if result['success'] else "失败",
             result['message'], request.client.host
         )
@@ -180,7 +164,7 @@ async def shutdown_container(
 
     except Exception as e:
         log_operation(
-            db, current_key.key_name, "关闭容器",
+            db, "关闭容器",
             vmid, node, "失败",
             str(e), request.client.host
         )
@@ -191,17 +175,14 @@ async def reboot_container(
     node: str,
     vmid: str,
     request: Request,
-    current_key: ApiKey = Depends(get_current_api_key),
+    _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
-    if not check_permissions(current_key, "write"):
-        raise HTTPException(status_code=403, detail="权限不足")
-
     try:
         result = proxmox_service.reboot_container(node, vmid)
 
         log_operation(
-            db, current_key.key_name, "重启容器",
+            db, "重启容器",
             vmid, node, "成功" if result['success'] else "失败",
             result['message'], request.client.host
         )
@@ -214,7 +195,7 @@ async def reboot_container(
 
     except Exception as e:
         log_operation(
-            db, current_key.key_name, "重启容器",
+            db, "重启容器",
             vmid, node, "失败",
             str(e), request.client.host
         )
@@ -225,12 +206,9 @@ async def get_task_status(
     node: str,
     task_id: str,
     request: Request,
-    current_key: ApiKey = Depends(get_current_api_key),
+    _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
-    if not check_permissions(current_key, "read"):
-        raise HTTPException(status_code=403, detail="权限不足")
-
     try:
         task_status = proxmox_service.get_task_status(node, task_id)
 
