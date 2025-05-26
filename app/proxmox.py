@@ -4,7 +4,6 @@ from typing import List, Dict, Any, Optional
 import logging
 import urllib3
 
-# 添加这行代码来禁用 InsecureRequestWarning 警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
@@ -23,10 +22,10 @@ class ProxmoxService:
                 password=settings.proxmox_password,
                 verify_ssl=settings.proxmox_verify_ssl
             )
-            logger.info("成功连接到Proxmox服务器")
+            logger.info("成功连接到 Proxmox 服务器")
         except Exception as e:
-            logger.error(f"连接Proxmox服务器失败: {str(e)}")
-            raise Exception(f"无法连接到Proxmox服务器: {str(e)}")
+            logger.error(f"连接 Proxmox 服务器失败: {str(e)}")
+            raise Exception(f"无法连接到 Proxmox 服务器: {str(e)}")
 
     def get_nodes(self) -> List[str]:
         try:
@@ -39,9 +38,9 @@ class ProxmoxService:
     def get_containers(self, node: str = None) -> List[Dict[str, Any]]:
         try:
             containers = []
-            nodes = [node] if node else self.get_nodes()
+            nodes_to_check = [node] if node else self.get_nodes()
 
-            for node_name in nodes:
+            for node_name in nodes_to_check:
                 node_containers = self.proxmox.nodes(node_name).lxc.get()
                 for container in node_containers:
                     container['node'] = node_name
@@ -60,7 +59,7 @@ class ProxmoxService:
             result = {
                 'vmid': vmid,
                 'node': node,
-                'status': status.get('status', 'unknown'),
+                'status': status.get('status', '未知'),
                 'name': config.get('hostname', f'CT-{vmid}'),
                 'uptime': status.get('uptime', 0),
                 'cpu': status.get('cpu', 0),
@@ -71,7 +70,7 @@ class ProxmoxService:
 
             return result
         except Exception as e:
-            logger.error(f"获取容器{vmid}状态失败: {str(e)}")
+            logger.error(f"获取容器 {vmid} 状态失败: {str(e)}")
             raise Exception(f"获取容器状态失败: {str(e)}")
 
     def start_container(self, node: str, vmid: str) -> Dict[str, Any]:
@@ -83,7 +82,7 @@ class ProxmoxService:
                 'task_id': result
             }
         except Exception as e:
-            logger.error(f"启动容器{vmid}失败: {str(e)}")
+            logger.error(f"启动容器 {vmid} 失败: {str(e)}")
             return {
                 'success': False,
                 'message': f'启动容器失败: {str(e)}'
@@ -98,7 +97,7 @@ class ProxmoxService:
                 'task_id': result
             }
         except Exception as e:
-            logger.error(f"停止容器{vmid}失败: {str(e)}")
+            logger.error(f"停止容器 {vmid} 失败: {str(e)}")
             return {
                 'success': False,
                 'message': f'停止容器失败: {str(e)}'
@@ -113,7 +112,7 @@ class ProxmoxService:
                 'task_id': result
             }
         except Exception as e:
-            logger.error(f"关机容器{vmid}失败: {str(e)}")
+            logger.error(f"关机容器 {vmid} 失败: {str(e)}")
             return {
                 'success': False,
                 'message': f'关机容器失败: {str(e)}'
@@ -128,7 +127,7 @@ class ProxmoxService:
                 'task_id': result
             }
         except Exception as e:
-            logger.error(f"重启容器{vmid}失败: {str(e)}")
+            logger.error(f"重启容器 {vmid} 失败: {str(e)}")
             return {
                 'success': False,
                 'message': f'重启容器失败: {str(e)}'
@@ -146,7 +145,7 @@ class ProxmoxService:
                 'endtime': task.get('endtime')
             }
         except Exception as e:
-            logger.error(f"获取任务{task_id}状态失败: {str(e)}")
+            logger.error(f"获取任务 {task_id} 状态失败: {str(e)}")
             return {
                 'status': 'error',
                 'message': f'获取任务状态失败: {str(e)}'
