@@ -20,4 +20,5 @@ def get_db():
         db.close()
 
 def create_tables():
+    from . import models
     Base.metadata.create_all(bind=engine)
