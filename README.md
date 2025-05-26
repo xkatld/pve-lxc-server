@@ -119,21 +119,3 @@ nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-keyfile key.pem --ss
 ```
 Authorization: Bearer 你的_非常_安全_的_API_密钥
 ```
-
----
-
-## 11. `.env.example`
-
-更新示例环境变量文件。
-
-```dotenv
-PROXMOX_HOST=192.168.1.100
-PROXMOX_PORT=8006
-PROXMOX_USER=root@pam
-PROXMOX_PASSWORD=your_pve_password
-PROXMOX_VERIFY_SSL=False
-
-DATABASE_URL="sqlite:///./lxc_api.db"
-
-GLOBAL_API_KEY="change_this_to_your_strong_api_key"
-```
