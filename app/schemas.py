@@ -50,3 +50,16 @@ class ContainerCreate(BaseModel):
     unprivileged: Optional[bool] = True
     start: Optional[bool] = False
     features: Optional[str] = None
+
+class ContainerRebuild(BaseModel):
+    ostemplate: str
+    hostname: str
+    password: str
+    cores: int = 1
+    memory: int = 512
+    swap: int = 512
+    storage: str
+    network: NetworkInterface
+    unprivileged: Optional[bool] = True
+    start: Optional[bool] = False
+    features: Optional[str] = None
