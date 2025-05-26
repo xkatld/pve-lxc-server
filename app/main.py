@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 import logging
 import sys
 
-from config import settings
-from database import create_tables, get_db
-from auth import create_api_key
-from api import router as api_router
-from schemas import ApiKeyCreate, ApiKeyResponse, ErrorResponse
+from .config import settings
+from .database import create_tables, get_db
+from .auth import create_api_key
+from .api import router as api_router
+from .schemas import ApiKeyCreate, ApiKeyResponse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -86,7 +86,7 @@ async def create_new_api_key(
             permissions=key_data.permissions,
             expires_days=key_data.expires_days
         )
-        
+
         return ApiKeyResponse(
             id=db_key.id,
             key_name=db_key.key_name,
@@ -96,7 +96,7 @@ async def create_new_api_key(
             expires_at=db_key.expires_at,
             permissions=db_key.permissions
         )
-        
+
     except Exception as e:
         logger.error(f"创建API密钥失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"创建API密钥失败: {str(e)}")
