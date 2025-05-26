@@ -145,6 +145,8 @@ class ProxmoxService:
                 net_config += f",gw={data.network.gw}"
             if data.network.vlan:
                 net_config += f",tag={data.network.vlan}"
+            if data.network.rate:
+                net_config += f",rate={data.network.rate}"
 
             params = {
                 'vmid': vmid,
@@ -154,14 +156,24 @@ class ProxmoxService:
                 'cores': data.cores,
                 'memory': data.memory,
                 'swap': data.swap,
-                'rootfs': data.storage,
+                'rootfs': f"{data.storage}:{data.disk_size}",
                 'net0': net_config,
                 'unprivileged': 1 if data.unprivileged else 0,
                 'start': 1 if data.start else 0,
             }
 
-            if data.features:
-                params['features'] = data.features
+            if data.cpulimit is not None:
+                params['cpulimit'] = data.cpulimit
+
+            current_features = data.features or ""
+            feature_list = [f.strip() for f in current_features.split(',') if f.strip()]
+
+            if data.nesting:
+                if 'nesting=1' not in feature_list:
+                    feature_list.append('nesting=1')
+
+            if feature_list:
+                params['features'] = ",".join(feature_list)
 
             result = self.proxmox.nodes(node).lxc.post(**params)
 
@@ -230,7 +242,7 @@ class ProxmoxService:
             logger.info(f"正在删除容器 {vmid}...")
             delete_result = self.delete_container(node, vmid)
             if not delete_result['success']:
-                 try: # 尝试忽略 'does not exist' 错误
+                 try:
                      if 'does not exist' not in delete_result['message']:
                          return {'success': False, 'message': f"重建失败: 删除容器失败 - {delete_result['message']}"}
                      logger.warning(f"删除容器 {vmid} 时出现 'does not exist' 错误，可能已被删除，继续执行创建。")
@@ -250,10 +262,13 @@ class ProxmoxService:
                 hostname=data.hostname,
                 password=data.password,
                 cores=data.cores,
+                cpulimit=data.cpulimit,
                 memory=data.memory,
                 swap=data.swap,
                 storage=data.storage,
+                disk_size=data.disk_size,
                 network=NetworkInterface(**data.network.model_dump()),
+                nesting=data.nesting,
                 unprivileged=data.unprivileged,
                 start=data.start,
                 features=data.features
