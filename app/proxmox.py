@@ -296,6 +296,26 @@ class ProxmoxService:
                 'message': f'重建容器失败: {str(e)}'
             }
 
+    def get_container_console(self, node: str, vmid: str) -> Dict[str, Any]:
+        try:
+            console_info = self.proxmox.nodes(node).lxc(vmid).vncproxy.post()
+            return {
+                'success': True,
+                'message': f'控制台票据获取成功',
+                'data': {
+                    'ticket': console_info['ticket'],
+                    'port': console_info['port'],
+                    'user': console_info['user'],
+                    'node': node,
+                    'host': settings.proxmox_host
+                }
+            }
+        except Exception as e:
+            logger.error(f"获取容器 {vmid} 控制台失败: {str(e)}")
+            return {
+                'success': False,
+                'message': f'获取控制台失败: {str(e)}'
+            }
 
     def get_task_status(self, node: str, task_id: str) -> Dict[str, Any]:
         try:
