@@ -4,7 +4,7 @@ from typing import List
 from .database import get_db
 from .auth import verify_api_key, log_operation
 from .proxmox import proxmox_service
-from .schemas import ContainerStatus, OperationResponse, ContainerList, ContainerCreate, ContainerRebuild
+from .schemas import ContainerStatus, OperationResponse, ContainerList, ContainerCreate, ContainerRebuild, ConsoleResponse
 
 router = APIRouter()
 
@@ -333,3 +333,38 @@ async def get_task_status(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取任务状态失败: {str(e)}")
+
+@router.post("/containers/{node}/{vmid}/console", response_model=ConsoleResponse, summary="获取容器控制台票据",
+             description="获取用于连接到LXC容器控制台的票据和连接信息。")
+async def get_container_console(
+    node: str,
+    vmid: str,
+    request: Request,
+    _: bool = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    try:
+        result = proxmox_service.get_container_console(node, vmid)
+
+        log_operation(
+            db, "获取控制台",
+            vmid, node, "成功" if result['success'] else "失败",
+            result['message'], request.client.host
+        )
+
+        if not result['success']:
+            raise HTTPException(status_code=500, detail=result['message'])
+
+        return ConsoleResponse(
+            success=result['success'],
+            message=result['message'],
+            data=result.get('data')
+        )
+
+    except Exception as e:
+        log_operation(
+            db, "获取控制台",
+            vmid, node, "失败",
+            str(e), request.client.host
+        )
+        raise HTTPException(status_code=500, detail=f"获取控制台失败: {str(e)}")
