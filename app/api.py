@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Path, Query
 from sqlalchemy.orm import Session
 from typing import List
 from .database import get_db
@@ -11,7 +11,7 @@ router = APIRouter()
 @router.get("/containers", response_model=ContainerList, summary="获取容器列表")
 async def get_containers(
     request: Request,
-    node: str = None,
+    node: str = Query(None, description="指定要查询的 Proxmox 节点名称 (可选，不提供则查询所有节点)", example="pve"),
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
@@ -85,8 +85,8 @@ async def create_container(
 
 @router.get("/containers/{node}/{vmid}/status", response_model=ContainerStatus, summary="获取容器状态")
 async def get_container_status(
-    node: str,
-    vmid: str,
+    node: str = Path(..., description="容器所在的 Proxmox 节点名称", example="pve"),
+    vmid: str = Path(..., description="要查询的容器 ID", example="105"),
     request: Request,
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
@@ -113,8 +113,8 @@ async def get_container_status(
 
 @router.post("/containers/{node}/{vmid}/start", response_model=OperationResponse, summary="启动容器")
 async def start_container(
-    node: str,
-    vmid: str,
+    node: str = Path(..., description="容器所在的 Proxmox 节点名称", example="pve"),
+    vmid: str = Path(..., description="要启动的容器 ID", example="105"),
     request: Request,
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
@@ -144,8 +144,8 @@ async def start_container(
 
 @router.post("/containers/{node}/{vmid}/stop", response_model=OperationResponse, summary="强制停止容器")
 async def stop_container(
-    node: str,
-    vmid: str,
+    node: str = Path(..., description="容器所在的 Proxmox 节点名称", example="pve"),
+    vmid: str = Path(..., description="要强制停止的容器 ID", example="105"),
     request: Request,
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
@@ -175,8 +175,8 @@ async def stop_container(
 
 @router.post("/containers/{node}/{vmid}/shutdown", response_model=OperationResponse, summary="关闭容器")
 async def shutdown_container(
-    node: str,
-    vmid: str,
+    node: str = Path(..., description="容器所在的 Proxmox 节点名称", example="pve"),
+    vmid: str = Path(..., description="要关闭的容器 ID", example="105"),
     request: Request,
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
@@ -206,8 +206,8 @@ async def shutdown_container(
 
 @router.post("/containers/{node}/{vmid}/reboot", response_model=OperationResponse, summary="重启容器")
 async def reboot_container(
-    node: str,
-    vmid: str,
+    node: str = Path(..., description="容器所在的 Proxmox 节点名称", example="pve"),
+    vmid: str = Path(..., description="要重启的容器 ID", example="105"),
     request: Request,
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
@@ -237,8 +237,8 @@ async def reboot_container(
 
 @router.delete("/containers/{node}/{vmid}", response_model=OperationResponse, summary="删除容器")
 async def delete_container(
-    node: str,
-    vmid: str,
+    node: str = Path(..., description="容器所在的 Proxmox 节点名称", example="pve"),
+    vmid: str = Path(..., description="要删除的容器 ID", example="105"),
     request: Request,
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
@@ -271,8 +271,8 @@ async def delete_container(
 
 @router.post("/containers/{node}/{vmid}/rebuild", response_model=OperationResponse, summary="重建容器")
 async def rebuild_container_api(
-    node: str,
-    vmid: str,
+    node: str = Path(..., description="容器所在的 Proxmox 节点名称", example="pve"),
+    vmid: str = Path(..., description="要重建的容器 ID", example="105"),
     rebuild_data: ContainerRebuild,
     request: Request,
     _: bool = Depends(verify_api_key),
@@ -307,8 +307,8 @@ async def rebuild_container_api(
 
 @router.get("/tasks/{node}/{task_id}", response_model=OperationResponse, summary="获取任务状态")
 async def get_task_status(
-    node: str,
-    task_id: str,
+    node: str = Path(..., description="任务所在的 Proxmox 节点名称", example="pve"),
+    task_id: str = Path(..., description="要查询的任务 ID (UPID)", example="UPID:pve:000ABCDE:12345678:614A73:5C21B4F3:lxccreate:105:root@pam:"),
     request: Request,
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
