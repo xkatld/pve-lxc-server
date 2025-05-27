@@ -70,3 +70,15 @@ class ContainerRebuild(BaseModel):
     unprivileged: Optional[bool] = Field(True, description="是否创建为非特权容器", example=True)
     start: Optional[bool] = Field(False, description="重建后是否立即启动", example=True)
     features: Optional[str] = Field(None, description="新的额外功能特性", example="nesting=1")
+
+class ConsoleTicket(BaseModel):
+    ticket: str
+    port: int
+    user: str
+    node: str
+    host: str
+
+class ConsoleResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[ConsoleTicket] = None
