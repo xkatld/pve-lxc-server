@@ -20,6 +20,11 @@ class OperationResponse(BaseModel):
     message: str
     data: Optional[Dict[str, Any]] = None
 
+class NodeResourceResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[List[Dict[str, Any]]] = None
+
 class ContainerList(BaseModel):
     containers: List[ContainerStatus]
     total: int
@@ -82,3 +87,19 @@ class ConsoleResponse(BaseModel):
     success: bool
     message: str
     data: Optional[ConsoleTicket] = None
+
+class NodeInfo(BaseModel):
+    node: str
+    status: str
+    uptime: int
+    cpu: float
+    maxcpu: int
+    mem: int
+    maxmem: int
+    disk: int
+    maxdisk: int
+
+class NodeListResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[List[NodeInfo]] = None
