@@ -22,17 +22,17 @@ class ProxmoxService:
                 port=settings.proxmox_port,
                 user=settings.proxmox_user,
                 password=settings.proxmox_password,
-                verify_ssl=settings.proxmox_verify_ssl
+                verify_ssl=False
             )
             logger.info("成功连接到 Proxmox 服务器")
         except Exception as e:
             logger.error(f"连接 Proxmox 服务器失败: {str(e)}")
             raise Exception(f"无法连接到 Proxmox 服务器: {str(e)}")
 
-    def get_nodes(self) -> List[str]:
+    def get_nodes(self) -> List[Dict[str, Any]]:
         try:
             nodes = self.proxmox.nodes.get()
-            return [node['node'] for node in nodes if node['status'] == 'online']
+            return [node for node in nodes if node.get('status') == 'online']
         except Exception as e:
             logger.error(f"获取节点列表失败: {str(e)}")
             raise Exception(f"获取节点列表失败: {str(e)}")
@@ -40,7 +40,7 @@ class ProxmoxService:
     def get_containers(self, node: str = None) -> List[Dict[str, Any]]:
         try:
             containers = []
-            nodes_to_check = [node] if node else self.get_nodes()
+            nodes_to_check = [node] if node else [n['node'] for n in self.get_nodes()]
 
             for node_name in nodes_to_check:
                 node_containers = self.proxmox.nodes(node_name).lxc.get()
@@ -334,5 +334,35 @@ class ProxmoxService:
                 'status': 'error',
                 'message': f'获取任务状态失败: {str(e)}'
             }
+
+    def get_templates(self, node: str) -> List[Dict[str, Any]]:
+        try:
+            storages = self.proxmox.nodes(node).storage.get()
+            templates = []
+            for storage in storages:
+                if 'vztmpl' in storage.get('content', ''):
+                    content = self.proxmox.nodes(node).storage(storage['storage']).content.get(content='vztmpl')
+                    templates.extend(content)
+            return templates
+        except Exception as e:
+            logger.error(f"获取节点 {node} 模板失败: {str(e)}")
+            raise Exception(f"获取节点模板失败: {str(e)}")
+
+    def get_storages(self, node: str) -> List[Dict[str, Any]]:
+        try:
+            storages = self.proxmox.nodes(node).storage.get()
+            return storages
+        except Exception as e:
+            logger.error(f"获取节点 {node} 存储失败: {str(e)}")
+            raise Exception(f"获取节点存储失败: {str(e)}")
+
+    def get_networks(self, node: str) -> List[Dict[str, Any]]:
+        try:
+            networks = self.proxmox.nodes(node).network.get(type='bridge')
+            return networks
+        except Exception as e:
+            logger.error(f"获取节点 {node} 网络失败: {str(e)}")
+            raise Exception(f"获取节点网络失败: {str(e)}")
+
 
 proxmox_service = ProxmoxService()
