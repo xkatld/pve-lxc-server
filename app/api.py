@@ -1,12 +1,137 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict, Any
 from .database import get_db
 from .auth import verify_api_key, log_operation
 from .proxmox import proxmox_service
-from .schemas import ContainerStatus, OperationResponse, ContainerList, ContainerCreate, ContainerRebuild, ConsoleResponse
+from .schemas import (
+    ContainerStatus, OperationResponse, ContainerList, ContainerCreate,
+    ContainerRebuild, ConsoleResponse, NodeResourceResponse, NodeInfo, NodeListResponse
+)
 
 router = APIRouter()
+
+@router.get("/nodes", response_model=NodeListResponse, summary="获取节点列表",
+            description="获取Proxmox VE集群中所有在线节点的基本信息。")
+async def get_nodes(
+    request: Request,
+    _: bool = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    try:
+        nodes_data = proxmox_service.get_nodes()
+        nodes_info = [NodeInfo(**node) for node in nodes_data]
+
+        log_operation(
+            db, "获取节点列表",
+            "集群", "所有节点", "成功",
+            f"获取到 {len(nodes_info)} 个节点",
+            request.client.host
+        )
+
+        return NodeListResponse(
+            success=True,
+            message="节点列表获取成功",
+            data=nodes_info
+        )
+
+    except Exception as e:
+        log_operation(
+            db, "获取节点列表",
+            "集群", "所有节点", "失败",
+            str(e), request.client.host
+        )
+        raise HTTPException(status_code=500, detail=f"获取节点列表失败: {str(e)}")
+
+
+@router.get("/nodes/{node}/templates", response_model=NodeResourceResponse, summary="获取节点CT模板",
+            description="获取指定Proxmox节点上可用的LXC容器模板列表。")
+async def get_node_templates(
+    node: str,
+    request: Request,
+    _: bool = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    try:
+        templates_data = proxmox_service.get_templates(node)
+        log_operation(
+            db, "获取节点模板",
+            node, node, "成功",
+            f"获取到 {len(templates_data)} 个模板",
+            request.client.host
+        )
+        return NodeResourceResponse(
+            success=True,
+            message="节点模板获取成功",
+            data=templates_data
+        )
+    except Exception as e:
+        log_operation(
+            db, "获取节点模板",
+            node, node, "失败",
+            str(e), request.client.host
+        )
+        raise HTTPException(status_code=500, detail=f"获取节点模板失败: {str(e)}")
+
+
+@router.get("/nodes/{node}/storages", response_model=NodeResourceResponse, summary="获取节点存储",
+            description="获取指定Proxmox节点上的存储资源列表及其信息。")
+async def get_node_storages(
+    node: str,
+    request: Request,
+    _: bool = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    try:
+        storages_data = proxmox_service.get_storages(node)
+        log_operation(
+            db, "获取节点存储",
+            node, node, "成功",
+            f"获取到 {len(storages_data)} 个存储",
+            request.client.host
+        )
+        return NodeResourceResponse(
+            success=True,
+            message="节点存储获取成功",
+            data=storages_data
+        )
+    except Exception as e:
+        log_operation(
+            db, "获取节点存储",
+            node, node, "失败",
+            str(e), request.client.host
+        )
+        raise HTTPException(status_code=500, detail=f"获取节点存储失败: {str(e)}")
+
+
+@router.get("/nodes/{node}/networks", response_model=NodeResourceResponse, summary="获取节点网络",
+            description="获取指定Proxmox节点上的网络（桥接）接口列表。")
+async def get_node_networks(
+    node: str,
+    request: Request,
+    _: bool = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    try:
+        networks_data = proxmox_service.get_networks(node)
+        log_operation(
+            db, "获取节点网络",
+            node, node, "成功",
+            f"获取到 {len(networks_data)} 个网络接口",
+            request.client.host
+        )
+        return NodeResourceResponse(
+            success=True,
+            message="节点网络获取成功",
+            data=networks_data
+        )
+    except Exception as e:
+        log_operation(
+            db, "获取节点网络",
+            node, node, "失败",
+            str(e), request.client.host
+        )
+        raise HTTPException(status_code=500, detail=f"获取节点网络失败: {str(e)}")
 
 @router.get("/containers", response_model=ContainerList, summary="获取容器列表",
             description="获取Proxmox VE节点上的LXC容器列表。可指定节点或获取所有在线节点的容器。")
