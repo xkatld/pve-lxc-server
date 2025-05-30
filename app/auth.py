@@ -18,7 +18,8 @@ def log_operation(
     node_name: str,
     status: str,
     message: str,
-    ip_address: str = None
+    ip_address: str = None,
+    task_id: str = None
 ):
     log_entry = OperationLog(
         operation=operation,
@@ -26,7 +27,8 @@ def log_operation(
         node_name=node_name,
         status=status,
         message=message,
-        ip_address=ip_address
+        ip_address=ip_address,
+        task_id=task_id
     )
 
     db.add(log_entry)
