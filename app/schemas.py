@@ -59,6 +59,7 @@ class ContainerCreate(BaseModel):
     unprivileged: Optional[bool] = Field(True, description="是否创建为非特权容器", example=True)
     start: Optional[bool] = Field(False, description="创建后是否立即启动容器", example=True)
     features: Optional[str] = Field(None, description="额外的功能特性 (例如 'keyctl=1,mount=cifs')", example="keyctl=1")
+    tty: Optional[int] = Field(None, description="分配的TTY控制台数量 (例如 1 或 2)", example=1)
 
 class ContainerRebuild(BaseModel):
     ostemplate: str = Field(..., description="新的操作系统模板", example="local:vztmpl/debian-11-standard_11.7-1_amd64.tar.gz")
