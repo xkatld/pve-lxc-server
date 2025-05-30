@@ -1,5 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
+from enum import Enum
+
+class ConsoleMode(str, Enum):
+    DEFAULT_TTY = "默认 (tty)"
+    SHELL = "shell"
 
 class ContainerStatus(BaseModel):
     vmid: str
@@ -59,7 +64,7 @@ class ContainerCreate(BaseModel):
     unprivileged: Optional[bool] = Field(True, description="是否创建为非特权容器", example=True)
     start: Optional[bool] = Field(False, description="创建后是否立即启动容器", example=True)
     features: Optional[str] = Field(None, description="额外的功能特性 (例如 'keyctl=1,mount=cifs')", example="keyctl=1")
-    tty: Optional[int] = Field(None, description="分配的TTY控制台数量 (例如 1 或 2)", example=1)
+    console_mode: Optional[ConsoleMode] = Field(ConsoleMode.DEFAULT_TTY, description="选择控制台模式: '默认 (tty)' 或 'shell'", example=ConsoleMode.DEFAULT_TTY)
 
 class ContainerRebuild(BaseModel):
     ostemplate: str = Field(..., description="新的操作系统模板", example="local:vztmpl/debian-11-standard_11.7-1_amd64.tar.gz")
@@ -76,6 +81,7 @@ class ContainerRebuild(BaseModel):
     unprivileged: Optional[bool] = Field(True, description="是否创建为非特权容器", example=True)
     start: Optional[bool] = Field(False, description="重建后是否立即启动", example=True)
     features: Optional[str] = Field(None, description="新的额外功能特性", example="nesting=1")
+    console_mode: Optional[ConsoleMode] = Field(ConsoleMode.DEFAULT_TTY, description="选择新的控制台模式: '默认 (tty)' 或 'shell'", example=ConsoleMode.DEFAULT_TTY)
 
 class ConsoleTicket(BaseModel):
     ticket: str
