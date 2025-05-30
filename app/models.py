@@ -13,3 +13,4 @@ class OperationLog(Base):
     message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     ip_address = Column(String(45))
+    task_id = Column(String(255), nullable=True, index=True)
