@@ -1,4 +1,4 @@
-# Proxmox LXC 管理接口 (zjmf-server-pve-lxc)
+# Proxmox LXC 管理接口 (pve-lxc-server)
 
 ## 项目目录结构
 
@@ -26,7 +26,7 @@ zjmf-server-pve-lxc/
 
 ## 项目部署与运行 (Debian 12)
 
-本指南将引导你在 Debian 12 系统上直接部署和运行 `zjmf-server-pve-lxc` 项目。
+本指南将引导你在 Debian 12 系统上直接部署和运行 `pve-lxc-server` 项目。
 
 ### 1. 环境准备
 
@@ -52,8 +52,8 @@ zjmf-server-pve-lxc/
 
 ```bash
 sudo apt install git -y
-git clone <你的项目仓库地址> # 或者将代码上传到服务器
-cd zjmf-server-pve-lxc
+git clone https://github.com/xkatld/pve-lxc-server
+cd pve-lxc-server
 ```
 
 ### 4. 配置环境
@@ -99,10 +99,6 @@ cd zjmf-server-pve-lxc
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-或者，如果需要后台运行并使用 HTTPS (推荐)：
-```bash
-nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-keyfile key.pem --ssl-certfile cert.pem > lxc_api_run.log 2>&1 &
 ```
 
 ### 7. 访问服务与认证
