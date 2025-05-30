@@ -1,5 +1,4 @@
-from proxmoxer import ProxmoxAPI
-from proxmoxer.core import ProxmoxResourceException
+from proxmoxer import ProxmoxAPI, ProxmoxResourceException
 from requests.exceptions import HTTPError, ConnectionError
 from .config import settings
 from .schemas import ContainerCreate, ContainerRebuild, NetworkInterface
@@ -24,20 +23,26 @@ class ProxmoxService:
                 port=settings.proxmox_port,
                 user=settings.proxmox_user,
                 password=settings.proxmox_password,
-                verify_ssl=settings.proxmox_verify_ssl # 使用配置中的verify_ssl
+                verify_ssl=settings.proxmox_verify_ssl
             )
             logger.info("成功连接到 Proxmox 服务器")
         except Exception as e:
             logger.error(f"连接 Proxmox 服务器失败: {str(e)}")
-            # 在初始化失败时，self.proxmox 将保持 None，后续调用会通过 _do_request 进一步处理
+            self.proxmox = None 
             raise Exception(f"无法连接到 Proxmox 服务器: {str(e)}")
 
     def _do_request(self, api_call_func, *args, **kwargs):
-        if self.proxmox is None: # 如果初始连接就失败了
+        if self.proxmox is None:
             logger.error("Proxmox API 实例未初始化，尝试重新连接。")
-            self._connect() # 尝试再次连接
-            if self.proxmox is None: # 如果还是失败
-                 raise Exception("Proxmox API 实例无法初始化，请检查连接配置。")
+            try:
+                self._connect()
+            except Exception as connect_initial_exc:
+                 logger.error(f"Proxmox API _do_request中的初始连接尝试失败: {str(connect_initial_exc)}")
+                 raise Exception(f"Proxmox API 实例无法初始化，请检查连接配置: {str(connect_initial_exc)}")
+
+            if self.proxmox is None: # 再次检查，如果_connect内部抛出异常前未将self.proxmox置None
+                 raise Exception("Proxmox API 实例无法在 _do_request 中初始化。")
+
 
         max_retries = 1
         for attempt in range(max_retries + 1):
@@ -47,22 +52,22 @@ class ProxmoxService:
                 is_auth_error = False
                 if isinstance(e, HTTPError) and e.response is not None and e.response.status_code == 401:
                     is_auth_error = True
-                elif "authenticate" in str(e).lower() or "ticket" in str(e).lower():
+                elif "authenticate" in str(e).lower() or "ticket" in str(e).lower() or (isinstance(e, ProxmoxResourceException) and "401" in str(e)):
                     is_auth_error = True
 
                 if is_auth_error and attempt < max_retries:
                     logger.warning(f"Proxmox API 请求认证失败 (尝试 {attempt + 1}/{max_retries + 1})，尝试重新连接: {str(e)}")
                     try:
                         self._connect()
-                        if self.proxmox is None: # 确保连接成功更新了实例
+                        if self.proxmox is None:
                             raise Exception("重新连接后 Proxmox API 实例仍未初始化。")
                     except Exception as connect_exc:
                         logger.error(f"重新连接 Proxmox 时失败: {str(connect_exc)}")
-                        raise connect_exc
+                        raise connect_exc 
                 else:
                     logger.error(f"Proxmox API 请求失败 (尝试 {attempt + 1}/{max_retries + 1}): {str(e)}")
                     raise e
-            except Exception as e:
+            except Exception as e: # 其他非预期错误
                 logger.error(f"执行 Proxmox API 调用时发生未知错误: {str(e)}")
                 raise
 
@@ -80,7 +85,9 @@ class ProxmoxService:
             nodes_to_check = [node] if node else [n['node'] for n in self.get_nodes()]
 
             for node_name in nodes_to_check:
-                node_containers = self._do_request(self.proxmox.nodes(node_name).lxc.get)
+                # 确保 self.proxmox.nodes(node_name).lxc.get 是一个可调用对象传递给 _do_request
+                get_lxc_func = self.proxmox.nodes(node_name).lxc.get
+                node_containers = self._do_request(get_lxc_func)
                 for container in node_containers:
                     container['node'] = node_name
                     containers.append(container)
@@ -91,8 +98,10 @@ class ProxmoxService:
 
     def get_container_status(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
-            status = self._do_request(self.proxmox.nodes(node).lxc(vmid).status.current.get)
-            config = self._do_request(self.proxmox.nodes(node).lxc(vmid).config.get)
+            status_func = self.proxmox.nodes(node).lxc(vmid).status.current.get
+            config_func = self.proxmox.nodes(node).lxc(vmid).config.get
+            status = self._do_request(status_func)
+            config = self._do_request(config_func)
 
             result = {
                 'vmid': vmid,
@@ -112,7 +121,8 @@ class ProxmoxService:
 
     def start_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
-            result = self._do_request(self.proxmox.nodes(node).lxc(vmid).status.start.post)
+            start_func = self.proxmox.nodes(node).lxc(vmid).status.start.post
+            result = self._do_request(start_func)
             return {
                 'success': True,
                 'message': f'容器 {vmid} 启动命令已发送',
@@ -127,7 +137,8 @@ class ProxmoxService:
 
     def stop_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
-            result = self._do_request(self.proxmox.nodes(node).lxc(vmid).status.stop.post)
+            stop_func = self.proxmox.nodes(node).lxc(vmid).status.stop.post
+            result = self._do_request(stop_func)
             return {
                 'success': True,
                 'message': f'容器 {vmid} 停止命令已发送',
@@ -142,7 +153,8 @@ class ProxmoxService:
 
     def shutdown_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
-            result = self._do_request(self.proxmox.nodes(node).lxc(vmid).status.shutdown.post)
+            shutdown_func = self.proxmox.nodes(node).lxc(vmid).status.shutdown.post
+            result = self._do_request(shutdown_func)
             return {
                 'success': True,
                 'message': f'容器 {vmid} 关机命令已发送',
@@ -157,7 +169,8 @@ class ProxmoxService:
 
     def reboot_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
-            result = self._do_request(self.proxmox.nodes(node).lxc(vmid).status.reboot.post)
+            reboot_func = self.proxmox.nodes(node).lxc(vmid).status.reboot.post
+            result = self._do_request(reboot_func)
             return {
                 'success': True,
                 'message': f'容器 {vmid} 重启命令已发送',
@@ -171,8 +184,8 @@ class ProxmoxService:
             }
 
     def create_container(self, data: ContainerCreate) -> Dict[str, Any]:
-        node = data.node # 提前获取，避免在异常处理中访问不到
-        vmid = data.vmid # 提前获取
+        node = data.node 
+        vmid = data.vmid 
         try:
             net_config = f"name={data.network.name},bridge={data.network.bridge},ip={data.network.ip}"
             if data.network.gw:
@@ -208,8 +221,9 @@ class ProxmoxService:
 
             if feature_list:
                 params['features'] = ",".join(feature_list)
-
-            result = self._do_request(self.proxmox.nodes(node).lxc.post, **params)
+            
+            create_lxc_func = self.proxmox.nodes(node).lxc.post
+            result = self._do_request(create_lxc_func, **params)
 
             return {
                 'success': True,
@@ -225,7 +239,8 @@ class ProxmoxService:
 
     def delete_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
-            result = self._do_request(self.proxmox.nodes(node).lxc(vmid).delete)
+            delete_func = self.proxmox.nodes(node).lxc(vmid).delete
+            result = self._do_request(delete_func)
             return {
                 'success': True,
                 'message': f'容器 {vmid} 删除任务已启动',
@@ -242,15 +257,15 @@ class ProxmoxService:
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
-                status = self.get_task_status(node, task_id) # get_task_status 内部已使用 _do_request
+                status = self.get_task_status(node, task_id) 
                 if status.get('status') == 'stopped':
                     return status.get('exitstatus') == 'OK'
-                elif status.get('status') == 'error':
-                    logger.error(f"任务 {task_id} 在节点 {node} 上执行失败: {status.get('exitstatus')}")
+                elif status.get('status') == 'error' or status.get('message'): # 如果get_task_status返回了错误消息
+                    logger.error(f"任务 {task_id} 在节点 {node} 上执行失败: {status.get('exitstatus') or status.get('message')}")
                     return False
             except Exception as e:
-                logger.warning(f"等待任务 {task_id} 时发生错误: {str(e)}")
-                return False # 出现获取状态的错误，也认为任务等待失败
+                logger.warning(f"等待任务 {task_id} 时获取状态发生错误: {str(e)}")
+                return False 
             time.sleep(2)
         logger.error(f"等待任务 {task_id} 超时")
         return False
@@ -268,39 +283,35 @@ class ProxmoxService:
                     if not self._wait_for_task(node, stop_result['task_id']):
                          return {'success': False, 'message': f"重建失败: 停止容器任务失败或超时 ({stop_result.get('task_id')})"}
                     logger.info(f"容器 {vmid} 已停止。")
-            except Exception as e:
-                 logger.info(f"容器 {vmid} 可能不存在或获取状态失败 ({str(e)})，继续执行删除。")
+            except Exception as e: # 包括获取状态失败或容器不存在的情况
+                 logger.info(f"检查容器 {vmid} 状态或停止容器时出现问题 ({str(e)})，继续执行删除。")
 
             logger.info(f"正在删除容器 {vmid}...")
             delete_result = self.delete_container(node, vmid)
+            
+            # 检查删除结果，即使删除操作本身返回success:false，如果原因是"does not exist"，也认为是可接受的
+            delete_failed_critically = False
             if not delete_result['success']:
-                 # 检查是否因为容器不存在而“失败”
-                 if 'does not exist' in delete_result.get('message', '').lower() or \
-                    (isinstance(delete_result.get('raw_response'), Exception) and \
-                     '404' in str(delete_result.get('raw_response'))): # 假设message包含原始错误
-                     logger.warning(f"删除容器 {vmid} 时返回 'does not exist' 或类似404错误，可能已被删除或不存在，继续执行创建。")
-                 else:
-                     return {'success': False, 'message': f"重建失败: 删除旧容器失败 - {delete_result['message']}"}
-            else:
+                msg_lower = delete_result.get('message', '').lower()
+                if 'does not exist' in msg_lower or 'not found' in msg_lower or '404' in msg_lower:
+                    logger.warning(f"删除容器 {vmid} 时报告容器不存在或未找到，将继续重建。消息: {delete_result['message']}")
+                else:
+                    delete_failed_critically = True # 其他删除失败原因
+            
+            if delete_failed_critically:
+                 return {'success': False, 'message': f"重建失败: 删除旧容器失败 - {delete_result['message']}"}
+            
+            if delete_result['success'] and delete_result.get('task_id'): # 只有当删除成功并有task_id时才等待
                 if not self._wait_for_task(node, delete_result['task_id']):
-                    # 如果删除任务本身失败（非容器不存在），则报错
+                    # 此处需要判断任务失败是否因为容器已经不存在
                     task_status_info = self.get_task_status(node, delete_result['task_id'])
-                    if not (task_status_info.get('exitstatus') == 'OK' and task_status_info.get('status') == 'stopped'):
-                        # 有些情况下，即使PVE API返回成功，任务也可能因为 "does not exist" 而结束。
-                        # 对于删除操作，如果容器一开始就不存在，PVE API的删除调用可能直接返回400/404错误，
-                        # delete_container 方法已经处理了这种情况并返回 success:False。
-                        # 如果delete_container返回success:True但_wait_for_task是False，则任务确实失败。
-                        # 但是，更常见的是delete_container直接因404而success:False。
-                        # 这里的逻辑需要小心处理 "成功删除一个不存在的容器" vs "删除任务失败"
-                        logger.warning(f"删除容器 {vmid} 任务 ({delete_result['task_id']}) 未成功完成或超时，但继续尝试创建。任务状态: {task_status_info}")
-                        # return {'success': False, 'message': f"重建失败: 删除容器任务 ({delete_result['task_id']}) 失败或超时。状态: {task_status_info}"}
-                    # else:
-                    # logger.info(f"容器 {vmid} 已删除 (任务 {delete_result['task_id']} 完成)。")
+                    logger.warning(f"删除容器 {vmid} 任务 ({delete_result['task_id']}) 未成功完成或超时，但继续尝试创建。任务状态: {task_status_info}")
+
 
             logger.info(f"正在使用新配置创建容器 {vmid}...")
             create_data = ContainerCreate(
                 node=node,
-                vmid=int(vmid), # vmid 在这里已经是 str，转为 int
+                vmid=int(vmid), 
                 ostemplate=data.ostemplate,
                 hostname=data.hostname,
                 password=data.password,
@@ -310,7 +321,7 @@ class ProxmoxService:
                 swap=data.swap,
                 storage=data.storage,
                 disk_size=data.disk_size,
-                network=NetworkInterface(**data.network.model_dump()), # 确保 network 是 NetworkInterface 实例
+                network=NetworkInterface(**data.network.model_dump()), 
                 nesting=data.nesting,
                 unprivileged=data.unprivileged,
                 start=data.start,
@@ -341,7 +352,8 @@ class ProxmoxService:
 
     def get_container_console(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
-            console_info = self._do_request(self.proxmox.nodes(node).lxc(vmid).vncproxy.post)
+            console_func = self.proxmox.nodes(node).lxc(vmid).vncproxy.post
+            console_info = self._do_request(console_func)
             return {
                 'success': True,
                 'message': f'控制台票据获取成功',
@@ -349,8 +361,8 @@ class ProxmoxService:
                     'ticket': console_info['ticket'],
                     'port': console_info['port'],
                     'user': console_info['user'],
-                    'node': node, # node 应该在 console_info 中，或者从参数传入
-                    'host': settings.proxmox_host # PVE 主机 IP
+                    'node': node, 
+                    'host': settings.proxmox_host 
                 }
             }
         except Exception as e:
@@ -362,7 +374,8 @@ class ProxmoxService:
 
     def get_task_status(self, node: str, task_id: str) -> Dict[str, Any]:
         try:
-            task = self._do_request(self.proxmox.nodes(node).tasks(task_id).status.get)
+            status_func = self.proxmox.nodes(node).tasks(task_id).status.get
+            task = self._do_request(status_func)
             return {
                 'status': task.get('status'),
                 'exitstatus': task.get('exitstatus'),
@@ -370,11 +383,10 @@ class ProxmoxService:
                 'id': task.get('id'),
                 'starttime': task.get('starttime'),
                 'endtime': task.get('endtime'),
-                'upid': task.get('upid') # 添加 UPID
+                'upid': task.get('upid') 
             }
         except Exception as e:
             logger.error(f"获取任务 {task_id} 状态失败: {str(e)}")
-            # 返回一个指示错误的数据结构，而不是直接抛出，以便调用方可以处理
             return {
                 'status': 'error',
                 'message': f'获取任务状态失败: {str(e)}',
@@ -387,8 +399,9 @@ class ProxmoxService:
             storages = self._do_request(self.proxmox.nodes(node).storage.get)
             templates = []
             for storage in storages:
-                if 'vztmpl' in storage.get('content', ''): # 确保 storage 是字典且有 'content' 键
-                    content = self._do_request(self.proxmox.nodes(node).storage(storage['storage']).content.get, content='vztmpl')
+                if 'vztmpl' in storage.get('content', ''): 
+                    content_func = self.proxmox.nodes(node).storage(storage['storage']).content.get
+                    content = self._do_request(content_func, content='vztmpl')
                     templates.extend(content)
             return templates
         except Exception as e:
@@ -405,7 +418,8 @@ class ProxmoxService:
 
     def get_networks(self, node: str) -> List[Dict[str, Any]]:
         try:
-            networks = self._do_request(self.proxmox.nodes(node).network.get, type='bridge')
+            networks_func = self.proxmox.nodes(node).network.get
+            networks = self._do_request(networks_func, type='bridge')
             return networks
         except Exception as e:
             logger.error(f"获取节点 {node} 网络失败: {str(e)}")
