@@ -1,7 +1,7 @@
 from proxmoxer import ProxmoxAPI
 from proxmoxer.core import AuthenticationError
 from .config import settings
-from .schemas import ContainerCreate, ContainerRebuild, NetworkInterface
+from .schemas import ContainerCreate, ContainerRebuild, NetworkInterface, ConsoleMode
 from typing import List, Dict, Any, Optional
 import logging
 import urllib3
@@ -199,8 +199,12 @@ class ProxmoxService:
             if feature_list:
                 params['features'] = ",".join(feature_list)
 
-            if data.tty is not None:
-                params['tty'] = data.tty
+            params['console'] = 1
+            if data.console_mode == ConsoleMode.SHELL:
+                params['tty'] = 1
+            else:
+                params['tty'] = 2
+
 
             result = self._call_proxmox_api(self.proxmox.nodes(node).lxc.post, **params)
 
@@ -299,7 +303,7 @@ class ProxmoxService:
                 unprivileged=data.unprivileged,
                 start=data.start,
                 features=data.features,
-                tty=None
+                console_mode=data.console_mode
             )
             create_result = self.create_container(create_data)
 
