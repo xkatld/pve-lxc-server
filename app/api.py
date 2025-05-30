@@ -12,7 +12,8 @@ from .schemas import (
 router = APIRouter()
 
 @router.get("/nodes", response_model=NodeListResponse, summary="获取节点列表",
-            description="获取Proxmox VE集群中所有在线节点的基本信息。")
+            description="获取Proxmox VE集群中所有在线节点的基本信息。",
+            tags=["节点管理"])
 async def get_nodes(
     request: Request,
     _: bool = Depends(verify_api_key),
@@ -45,7 +46,8 @@ async def get_nodes(
 
 
 @router.get("/nodes/{node}/templates", response_model=NodeResourceResponse, summary="获取节点CT模板",
-            description="获取指定Proxmox节点上可用的LXC容器模板列表。")
+            description="获取指定Proxmox节点上可用的LXC容器模板列表。",
+            tags=["节点管理"])
 async def get_node_templates(
     node: str,
     request: Request,
@@ -75,7 +77,8 @@ async def get_node_templates(
 
 
 @router.get("/nodes/{node}/storages", response_model=NodeResourceResponse, summary="获取节点存储",
-            description="获取指定Proxmox节点上的存储资源列表及其信息。")
+            description="获取指定Proxmox节点上的存储资源列表及其信息。",
+            tags=["节点管理"])
 async def get_node_storages(
     node: str,
     request: Request,
@@ -105,7 +108,8 @@ async def get_node_storages(
 
 
 @router.get("/nodes/{node}/networks", response_model=NodeResourceResponse, summary="获取节点网络",
-            description="获取指定Proxmox节点上的网络（桥接）接口列表。")
+            description="获取指定Proxmox节点上的网络（桥接）接口列表。",
+            tags=["节点管理"])
 async def get_node_networks(
     node: str,
     request: Request,
@@ -134,7 +138,8 @@ async def get_node_networks(
         raise HTTPException(status_code=500, detail=f"获取节点网络失败: {str(e)}")
 
 @router.get("/containers", response_model=ContainerList, summary="获取容器列表",
-            description="获取Proxmox VE节点上的LXC容器列表。可指定节点或获取所有在线节点的容器。")
+            description="获取Proxmox VE节点上的LXC容器列表。可指定节点或获取所有在线节点的容器。",
+            tags=["容器管理"])
 async def get_containers(
     request: Request,
     node: str = None,
@@ -176,7 +181,8 @@ async def get_containers(
         raise HTTPException(status_code=500, detail=f"获取容器列表失败: {str(e)}")
 
 @router.post("/containers", response_model=OperationResponse, summary="创建LXC容器",
-             description="在指定的Proxmox节点上创建一个新的LXC容器。")
+             description="在指定的Proxmox节点上创建一个新的LXC容器。",
+             tags=["容器管理"])
 async def create_container(
     container_data: ContainerCreate,
     request: Request,
@@ -211,7 +217,8 @@ async def create_container(
         raise HTTPException(status_code=500, detail=f"创建容器失败: {str(e)}")
 
 @router.get("/containers/{node}/{vmid}/status", response_model=ContainerStatus, summary="获取容器状态",
-             description="获取指定节点上特定VMID的LXC容器的当前状态和基本信息。")
+             description="获取指定节点上特定VMID的LXC容器的当前状态和基本信息。",
+             tags=["容器操作"])
 async def get_container_status(
     node: str,
     vmid: str,
@@ -240,7 +247,8 @@ async def get_container_status(
         raise HTTPException(status_code=500, detail=f"获取容器状态失败: {str(e)}")
 
 @router.post("/containers/{node}/{vmid}/start", response_model=OperationResponse, summary="启动容器",
-             description="启动指定的LXC容器。")
+             description="启动指定的LXC容器。",
+             tags=["容器操作"])
 async def start_container(
     node: str,
     vmid: str,
@@ -272,7 +280,8 @@ async def start_container(
         raise HTTPException(status_code=500, detail=f"启动容器失败: {str(e)}")
 
 @router.post("/containers/{node}/{vmid}/stop", response_model=OperationResponse, summary="强制停止容器",
-             description="强制停止指定的LXC容器 (慎用)。")
+             description="强制停止指定的LXC容器 (慎用)。",
+             tags=["容器操作"])
 async def stop_container(
     node: str,
     vmid: str,
@@ -304,7 +313,8 @@ async def stop_container(
         raise HTTPException(status_code=500, detail=f"强制停止容器失败: {str(e)}")
 
 @router.post("/containers/{node}/{vmid}/shutdown", response_model=OperationResponse, summary="关闭容器",
-             description="优雅地关闭指定的LXC容器。")
+             description="优雅地关闭指定的LXC容器。",
+             tags=["容器操作"])
 async def shutdown_container(
     node: str,
     vmid: str,
@@ -336,7 +346,8 @@ async def shutdown_container(
         raise HTTPException(status_code=500, detail=f"关闭容器失败: {str(e)}")
 
 @router.post("/containers/{node}/{vmid}/reboot", response_model=OperationResponse, summary="重启容器",
-             description="重启指定的LXC容器。")
+             description="重启指定的LXC容器。",
+             tags=["容器操作"])
 async def reboot_container(
     node: str,
     vmid: str,
@@ -368,7 +379,8 @@ async def reboot_container(
         raise HTTPException(status_code=500, detail=f"重启容器失败: {str(e)}")
 
 @router.delete("/containers/{node}/{vmid}", response_model=OperationResponse, summary="删除容器",
-               description="删除指定的LXC容器。**危险操作，请谨慎使用！**")
+               description="删除指定的LXC容器。**危险操作，请谨慎使用！**",
+               tags=["容器操作"])
 async def delete_container(
     node: str,
     vmid: str,
@@ -403,7 +415,8 @@ async def delete_container(
         raise HTTPException(status_code=500, detail=f"删除容器失败: {str(e)}")
 
 @router.post("/containers/{node}/{vmid}/rebuild", response_model=OperationResponse, summary="重建容器",
-             description="销毁并使用新的配置重新创建指定的LXC容器。**危险操作，数据会丢失！**")
+             description="销毁并使用新的配置重新创建指定的LXC容器。**危险操作，数据会丢失！**",
+             tags=["容器操作"])
 async def rebuild_container_api(
     node: str,
     vmid: str,
@@ -439,7 +452,8 @@ async def rebuild_container_api(
         raise HTTPException(status_code=500, detail=f"重建容器失败: {str(e)}")
 
 @router.get("/tasks/{node}/{task_id}", response_model=OperationResponse, summary="获取任务状态",
-            description="获取Proxmox中特定异步任务的状态。")
+            description="获取Proxmox中特定异步任务的状态。",
+            tags=["任务管理"])
 async def get_task_status(
     node: str,
     task_id: str,
@@ -460,7 +474,8 @@ async def get_task_status(
         raise HTTPException(status_code=500, detail=f"获取任务状态失败: {str(e)}")
 
 @router.post("/containers/{node}/{vmid}/console", response_model=ConsoleResponse, summary="获取容器控制台票据",
-             description="获取用于连接到LXC容器控制台的票据和连接信息。")
+             description="获取用于连接到LXC容器控制台的票据和连接信息。",
+             tags=["容器操作"])
 async def get_container_console(
     node: str,
     vmid: str,
