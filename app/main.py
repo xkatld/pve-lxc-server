@@ -6,7 +6,7 @@ from logging.handlers import TimedRotatingFileHandler
 import sys
 import datetime
 import uuid
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseCallNext
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 
 
@@ -54,17 +54,17 @@ app = FastAPI(
 )
 
 class RequestContextLogMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: StarletteRequest, call_next: RequestResponseCallNext):
+    async def dispatch(self, request: StarletteRequest, call_next: "RequestResponseCallNext"):
         token = request_task_id_cv.set(str(uuid.uuid4()))
         task_id_for_header_and_log = request_task_id_cv.get()
 
         logger.info(f"请求开始: {request.method} {request.url.path} 从 {request.client.host}")
-        
+
         response = await call_next(request)
-        
+
         response.headers["X-Task-ID"] = task_id_for_header_and_log
         logger.info(f"请求完成: {request.method} {request.url.path} - 状态码 {response.status_code}")
-        
+
         request_task_id_cv.reset(token)
         return response
 
