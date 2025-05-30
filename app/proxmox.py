@@ -1,4 +1,5 @@
-from proxmoxer import ProxmoxAPI, ProxmoxResourceException
+from proxmoxer import ProxmoxAPI
+from proxmoxer.core import ProxmoxResourceException
 from requests.exceptions import HTTPError, ConnectionError
 from .config import settings
 from .schemas import ContainerCreate, ContainerRebuild, NetworkInterface
