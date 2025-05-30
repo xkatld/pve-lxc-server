@@ -8,6 +8,7 @@ from .schemas import (
     ContainerStatus, OperationResponse, ContainerList, ContainerCreate,
     ContainerRebuild, ConsoleResponse, NodeResourceResponse, NodeInfo, NodeListResponse
 )
+from .logging_context import request_task_id_cv
 
 router = APIRouter()
 
@@ -19,6 +20,7 @@ async def get_nodes(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
     try:
         nodes_data = proxmox_service.get_nodes()
         nodes_info = [NodeInfo(**node) for node in nodes_data]
@@ -27,7 +29,8 @@ async def get_nodes(
             db, "获取节点列表",
             "集群", "所有节点", "成功",
             f"获取到 {len(nodes_info)} 个节点",
-            request.client.host
+            request.client.host,
+            task_id=request_id
         )
 
         return NodeListResponse(
@@ -40,7 +43,8 @@ async def get_nodes(
         log_operation(
             db, "获取节点列表",
             "集群", "所有节点", "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=request_id
         )
         raise HTTPException(status_code=500, detail=f"获取节点列表失败: {str(e)}")
 
@@ -54,13 +58,15 @@ async def get_node_templates(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
     try:
         templates_data = proxmox_service.get_templates(node)
         log_operation(
             db, "获取节点模板",
             node, node, "成功",
             f"获取到 {len(templates_data)} 个模板",
-            request.client.host
+            request.client.host,
+            task_id=request_id
         )
         return NodeResourceResponse(
             success=True,
@@ -71,7 +77,8 @@ async def get_node_templates(
         log_operation(
             db, "获取节点模板",
             node, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=request_id
         )
         raise HTTPException(status_code=500, detail=f"获取节点模板失败: {str(e)}")
 
@@ -85,13 +92,15 @@ async def get_node_storages(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
     try:
         storages_data = proxmox_service.get_storages(node)
         log_operation(
             db, "获取节点存储",
             node, node, "成功",
             f"获取到 {len(storages_data)} 个存储",
-            request.client.host
+            request.client.host,
+            task_id=request_id
         )
         return NodeResourceResponse(
             success=True,
@@ -102,7 +111,8 @@ async def get_node_storages(
         log_operation(
             db, "获取节点存储",
             node, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=request_id
         )
         raise HTTPException(status_code=500, detail=f"获取节点存储失败: {str(e)}")
 
@@ -116,13 +126,15 @@ async def get_node_networks(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
     try:
         networks_data = proxmox_service.get_networks(node)
         log_operation(
             db, "获取节点网络",
             node, node, "成功",
             f"获取到 {len(networks_data)} 个网络接口",
-            request.client.host
+            request.client.host,
+            task_id=request_id
         )
         return NodeResourceResponse(
             success=True,
@@ -133,7 +145,8 @@ async def get_node_networks(
         log_operation(
             db, "获取节点网络",
             node, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=request_id
         )
         raise HTTPException(status_code=500, detail=f"获取节点网络失败: {str(e)}")
 
@@ -146,6 +159,7 @@ async def get_containers(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
     try:
         containers_data = proxmox_service.get_containers(node)
         containers = []
@@ -167,7 +181,8 @@ async def get_containers(
             db, "获取容器列表",
             node or "所有节点", node or "所有节点", "成功",
             f"获取到 {len(containers)} 个容器",
-            request.client.host
+            request.client.host,
+            task_id=request_id
         )
 
         return ContainerList(containers=containers, total=len(containers))
@@ -176,7 +191,8 @@ async def get_containers(
         log_operation(
             db, "获取容器列表",
             node or "所有节点", node or "所有节点", "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=request_id
         )
         raise HTTPException(status_code=500, detail=f"获取容器列表失败: {str(e)}")
 
@@ -189,14 +205,19 @@ async def create_container(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
+    pve_task_id = None
     try:
         result = proxmox_service.create_container(container_data)
+        pve_task_id = result.get('task_id')
+        effective_task_id = pve_task_id or request_id
 
         log_operation(
             db, "创建容器",
             str(container_data.vmid), container_data.node,
             "成功" if result['success'] else "失败",
-            result['message'], request.client.host
+            result['message'], request.client.host,
+            task_id=effective_task_id
         )
 
         if not result['success']:
@@ -205,14 +226,15 @@ async def create_container(
         return OperationResponse(
             success=result['success'],
             message=result['message'],
-            data={'task_id': result.get('task_id')} if result['success'] else None
+            data={'task_id': effective_task_id} if result['success'] else None
         )
 
     except Exception as e:
         log_operation(
             db, "创建容器",
             str(container_data.vmid), container_data.node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=pve_task_id or request_id
         )
         raise HTTPException(status_code=500, detail=f"创建容器失败: {str(e)}")
 
@@ -226,6 +248,7 @@ async def get_container_status(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
     try:
         status_data = proxmox_service.get_container_status(node, vmid)
 
@@ -233,7 +256,8 @@ async def get_container_status(
             db, "获取容器状态",
             vmid, node, "成功",
             f"容器状态: {status_data['status']}",
-            request.client.host
+            request.client.host,
+            task_id=request_id
         )
 
         return ContainerStatus(**status_data)
@@ -242,7 +266,8 @@ async def get_container_status(
         log_operation(
             db, "获取容器状态",
             vmid, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=request_id
         )
         raise HTTPException(status_code=500, detail=f"获取容器状态失败: {str(e)}")
 
@@ -256,26 +281,32 @@ async def start_container(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
+    pve_task_id = None
     try:
         result = proxmox_service.start_container(node, vmid)
+        pve_task_id = result.get('task_id')
+        effective_task_id = pve_task_id or request_id
 
         log_operation(
             db, "启动容器",
             vmid, node, "成功" if result['success'] else "失败",
-            result['message'], request.client.host
+            result['message'], request.client.host,
+            task_id=effective_task_id
         )
 
         return OperationResponse(
             success=result['success'],
             message=result['message'],
-            data={'task_id': result.get('task_id')} if result['success'] else None
+            data={'task_id': effective_task_id} if result['success'] else None
         )
 
     except Exception as e:
         log_operation(
             db, "启动容器",
             vmid, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=pve_task_id or request_id
         )
         raise HTTPException(status_code=500, detail=f"启动容器失败: {str(e)}")
 
@@ -289,26 +320,32 @@ async def stop_container(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
+    pve_task_id = None
     try:
         result = proxmox_service.stop_container(node, vmid)
+        pve_task_id = result.get('task_id')
+        effective_task_id = pve_task_id or request_id
 
         log_operation(
             db, "强制停止容器",
             vmid, node, "成功" if result['success'] else "失败",
-            result['message'], request.client.host
+            result['message'], request.client.host,
+            task_id=effective_task_id
         )
 
         return OperationResponse(
             success=result['success'],
             message=result['message'],
-            data={'task_id': result.get('task_id')} if result['success'] else None
+            data={'task_id': effective_task_id} if result['success'] else None
         )
 
     except Exception as e:
         log_operation(
             db, "强制停止容器",
             vmid, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=pve_task_id or request_id
         )
         raise HTTPException(status_code=500, detail=f"强制停止容器失败: {str(e)}")
 
@@ -322,26 +359,32 @@ async def shutdown_container(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
+    pve_task_id = None
     try:
         result = proxmox_service.shutdown_container(node, vmid)
+        pve_task_id = result.get('task_id')
+        effective_task_id = pve_task_id or request_id
 
         log_operation(
             db, "关闭容器",
             vmid, node, "成功" if result['success'] else "失败",
-            result['message'], request.client.host
+            result['message'], request.client.host,
+            task_id=effective_task_id
         )
 
         return OperationResponse(
             success=result['success'],
             message=result['message'],
-            data={'task_id': result.get('task_id')} if result['success'] else None
+            data={'task_id': effective_task_id} if result['success'] else None
         )
 
     except Exception as e:
         log_operation(
             db, "关闭容器",
             vmid, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=pve_task_id or request_id
         )
         raise HTTPException(status_code=500, detail=f"关闭容器失败: {str(e)}")
 
@@ -355,26 +398,32 @@ async def reboot_container(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
+    pve_task_id = None
     try:
         result = proxmox_service.reboot_container(node, vmid)
+        pve_task_id = result.get('task_id')
+        effective_task_id = pve_task_id or request_id
 
         log_operation(
             db, "重启容器",
             vmid, node, "成功" if result['success'] else "失败",
-            result['message'], request.client.host
+            result['message'], request.client.host,
+            task_id=effective_task_id
         )
 
         return OperationResponse(
             success=result['success'],
             message=result['message'],
-            data={'task_id': result.get('task_id')} if result['success'] else None
+            data={'task_id': effective_task_id} if result['success'] else None
         )
 
     except Exception as e:
         log_operation(
             db, "重启容器",
             vmid, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=pve_task_id or request_id
         )
         raise HTTPException(status_code=500, detail=f"重启容器失败: {str(e)}")
 
@@ -388,13 +437,18 @@ async def delete_container(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
+    pve_task_id = None
     try:
         result = proxmox_service.delete_container(node, vmid)
+        pve_task_id = result.get('task_id')
+        effective_task_id = pve_task_id or request_id
 
         log_operation(
             db, "删除容器",
             vmid, node, "成功" if result['success'] else "失败",
-            result['message'], request.client.host
+            result['message'], request.client.host,
+            task_id=effective_task_id
         )
 
         if not result['success']:
@@ -403,14 +457,15 @@ async def delete_container(
         return OperationResponse(
             success=result['success'],
             message=result['message'],
-            data={'task_id': result.get('task_id')} if result['success'] else None
+            data={'task_id': effective_task_id} if result['success'] else None
         )
 
     except Exception as e:
         log_operation(
             db, "删除容器",
             vmid, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=pve_task_id or request_id
         )
         raise HTTPException(status_code=500, detail=f"删除容器失败: {str(e)}")
 
@@ -425,13 +480,18 @@ async def rebuild_container_api(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
+    pve_task_id = None
     try:
         result = proxmox_service.rebuild_container(node, vmid, rebuild_data)
+        pve_task_id = result.get('task_id')
+        effective_task_id = pve_task_id or request_id
 
         log_operation(
             db, "重建容器",
             vmid, node, "成功" if result['success'] else "失败",
-            result['message'], request.client.host
+            result['message'], request.client.host,
+            task_id=effective_task_id
         )
 
         if not result['success']:
@@ -440,14 +500,15 @@ async def rebuild_container_api(
         return OperationResponse(
             success=result['success'],
             message=result['message'],
-            data={'task_id': result.get('task_id')} if result['success'] else None
+            data={'task_id': effective_task_id} if result['success'] else None
         )
 
     except Exception as e:
         log_operation(
             db, "重建容器",
             vmid, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=pve_task_id or request_id
         )
         raise HTTPException(status_code=500, detail=f"重建容器失败: {str(e)}")
 
@@ -456,18 +517,18 @@ async def rebuild_container_api(
             tags=["任务管理"])
 async def get_task_status(
     node: str,
-    task_id: str,
+    task_id: str, 
     request: Request,
     _: bool = Depends(verify_api_key),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db) 
 ):
+    request_tracking_id = request_task_id_cv.get() 
     try:
         task_status = proxmox_service.get_task_status(node, task_id)
-
         return OperationResponse(
             success=True,
             message="任务状态获取成功",
-            data=task_status
+            data=task_status 
         )
 
     except Exception as e:
@@ -483,18 +544,20 @@ async def get_container_console(
     _: bool = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
+    request_id = request_task_id_cv.get()
     try:
         result = proxmox_service.get_container_console(node, vmid)
 
         log_operation(
             db, "获取控制台",
             vmid, node, "成功" if result['success'] else "失败",
-            result['message'], request.client.host
+            result['message'], request.client.host,
+            task_id=request_id 
         )
 
         if not result['success']:
             raise HTTPException(status_code=500, detail=result['message'])
-
+        
         return ConsoleResponse(
             success=result['success'],
             message=result['message'],
@@ -505,6 +568,7 @@ async def get_container_console(
         log_operation(
             db, "获取控制台",
             vmid, node, "失败",
-            str(e), request.client.host
+            str(e), request.client.host,
+            task_id=request_id
         )
         raise HTTPException(status_code=500, detail=f"获取控制台失败: {str(e)}")
