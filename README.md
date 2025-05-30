@@ -19,8 +19,6 @@ zjmf-server-pve-lxc/
 ├── requirements.txt                # 项目所需的Python依赖库列表
 ├── .env.example                    # 环境变量配置文件示例
 ├── .env                           # 环境变量配置文件（需自行创建和配置）
-├── Dockerfile                      # Docker镜像构建文件
-├── docker-compose.yml              # Docker Compose部署配置文件
 └── README.md                       # 项目说明文档
 ```
 
