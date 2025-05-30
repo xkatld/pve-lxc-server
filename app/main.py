@@ -55,7 +55,7 @@ async def startup_event():
 async def shutdown_event():
     logger.info("LXC 管理 API 服务正在关闭...")
 
-@app.get("/", summary="服务状态检查")
+@app.get("/", summary="服务状态检查", tags=["服务状态"])
 async def root():
     return {
         "service": "Proxmox LXC 管理 API",
@@ -64,7 +64,7 @@ async def root():
         "docs": "/docs"
     }
 
-@app.get("/health", summary="健康检查")
+@app.get("/health", summary="健康检查", tags=["服务状态"])
 async def health_check():
     return {
         "status": "健康",
@@ -72,7 +72,7 @@ async def health_check():
         "timestamp": datetime.datetime.now().isoformat()
     }
 
-app.include_router(api_router, prefix="/api/v1", tags=["LXC 容器管理", "节点资源管理"])
+app.include_router(api_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
