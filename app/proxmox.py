@@ -199,6 +199,9 @@ class ProxmoxService:
             if feature_list:
                 params['features'] = ",".join(feature_list)
 
+            if data.tty is not None:
+                params['tty'] = data.tty
+
             result = self._call_proxmox_api(self.proxmox.nodes(node).lxc.post, **params)
 
             return {
@@ -295,7 +298,8 @@ class ProxmoxService:
                 nesting=data.nesting,
                 unprivileged=data.unprivileged,
                 start=data.start,
-                features=data.features
+                features=data.features,
+                tty=None
             )
             create_result = self.create_container(create_data)
 
