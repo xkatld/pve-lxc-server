@@ -1,4 +1,5 @@
-from proxmoxer import ProxmoxAPI, ProxmoxResourceException
+from proxmoxer import ProxmoxAPI
+from proxmoxer.proxmoxer import ProxmoxResourceException
 from requests.exceptions import HTTPError, ConnectionError
 from .config import settings
 from .schemas import ContainerCreate, ContainerRebuild, NetworkInterface
@@ -28,7 +29,7 @@ class ProxmoxService:
             logger.info("成功连接到 Proxmox 服务器")
         except Exception as e:
             logger.error(f"连接 Proxmox 服务器失败: {str(e)}")
-            self.proxmox = None 
+            self.proxmox = None
             raise Exception(f"无法连接到 Proxmox 服务器: {str(e)}")
 
     def _do_request(self, api_call_func, *args, **kwargs):
@@ -40,9 +41,8 @@ class ProxmoxService:
                  logger.error(f"Proxmox API _do_request中的初始连接尝试失败: {str(connect_initial_exc)}")
                  raise Exception(f"Proxmox API 实例无法初始化，请检查连接配置: {str(connect_initial_exc)}")
 
-            if self.proxmox is None: # 再次检查，如果_connect内部抛出异常前未将self.proxmox置None
+            if self.proxmox is None:
                  raise Exception("Proxmox API 实例无法在 _do_request 中初始化。")
-
 
         max_retries = 1
         for attempt in range(max_retries + 1):
@@ -63,11 +63,11 @@ class ProxmoxService:
                             raise Exception("重新连接后 Proxmox API 实例仍未初始化。")
                     except Exception as connect_exc:
                         logger.error(f"重新连接 Proxmox 时失败: {str(connect_exc)}")
-                        raise connect_exc 
+                        raise connect_exc
                 else:
                     logger.error(f"Proxmox API 请求失败 (尝试 {attempt + 1}/{max_retries + 1}): {str(e)}")
                     raise e
-            except Exception as e: # 其他非预期错误
+            except Exception as e:
                 logger.error(f"执行 Proxmox API 调用时发生未知错误: {str(e)}")
                 raise
 
@@ -85,7 +85,6 @@ class ProxmoxService:
             nodes_to_check = [node] if node else [n['node'] for n in self.get_nodes()]
 
             for node_name in nodes_to_check:
-                # 确保 self.proxmox.nodes(node_name).lxc.get 是一个可调用对象传递给 _do_request
                 get_lxc_func = self.proxmox.nodes(node_name).lxc.get
                 node_containers = self._do_request(get_lxc_func)
                 for container in node_containers:
@@ -184,8 +183,8 @@ class ProxmoxService:
             }
 
     def create_container(self, data: ContainerCreate) -> Dict[str, Any]:
-        node = data.node 
-        vmid = data.vmid 
+        node = data.node
+        vmid = data.vmid
         try:
             net_config = f"name={data.network.name},bridge={data.network.bridge},ip={data.network.ip}"
             if data.network.gw:
@@ -221,7 +220,7 @@ class ProxmoxService:
 
             if feature_list:
                 params['features'] = ",".join(feature_list)
-            
+
             create_lxc_func = self.proxmox.nodes(node).lxc.post
             result = self._do_request(create_lxc_func, **params)
 
@@ -257,15 +256,15 @@ class ProxmoxService:
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
-                status = self.get_task_status(node, task_id) 
+                status = self.get_task_status(node, task_id)
                 if status.get('status') == 'stopped':
                     return status.get('exitstatus') == 'OK'
-                elif status.get('status') == 'error' or status.get('message'): # 如果get_task_status返回了错误消息
+                elif status.get('status') == 'error' or status.get('message'):
                     logger.error(f"任务 {task_id} 在节点 {node} 上执行失败: {status.get('exitstatus') or status.get('message')}")
                     return False
             except Exception as e:
                 logger.warning(f"等待任务 {task_id} 时获取状态发生错误: {str(e)}")
-                return False 
+                return False
             time.sleep(2)
         logger.error(f"等待任务 {task_id} 超时")
         return False
@@ -283,35 +282,32 @@ class ProxmoxService:
                     if not self._wait_for_task(node, stop_result['task_id']):
                          return {'success': False, 'message': f"重建失败: 停止容器任务失败或超时 ({stop_result.get('task_id')})"}
                     logger.info(f"容器 {vmid} 已停止。")
-            except Exception as e: # 包括获取状态失败或容器不存在的情况
+            except Exception as e:
                  logger.info(f"检查容器 {vmid} 状态或停止容器时出现问题 ({str(e)})，继续执行删除。")
 
             logger.info(f"正在删除容器 {vmid}...")
             delete_result = self.delete_container(node, vmid)
-            
-            # 检查删除结果，即使删除操作本身返回success:false，如果原因是"does not exist"，也认为是可接受的
+
             delete_failed_critically = False
             if not delete_result['success']:
                 msg_lower = delete_result.get('message', '').lower()
                 if 'does not exist' in msg_lower or 'not found' in msg_lower or '404' in msg_lower:
                     logger.warning(f"删除容器 {vmid} 时报告容器不存在或未找到，将继续重建。消息: {delete_result['message']}")
                 else:
-                    delete_failed_critically = True # 其他删除失败原因
-            
+                    delete_failed_critically = True
+
             if delete_failed_critically:
                  return {'success': False, 'message': f"重建失败: 删除旧容器失败 - {delete_result['message']}"}
-            
-            if delete_result['success'] and delete_result.get('task_id'): # 只有当删除成功并有task_id时才等待
+
+            if delete_result['success'] and delete_result.get('task_id'):
                 if not self._wait_for_task(node, delete_result['task_id']):
-                    # 此处需要判断任务失败是否因为容器已经不存在
                     task_status_info = self.get_task_status(node, delete_result['task_id'])
                     logger.warning(f"删除容器 {vmid} 任务 ({delete_result['task_id']}) 未成功完成或超时，但继续尝试创建。任务状态: {task_status_info}")
-
 
             logger.info(f"正在使用新配置创建容器 {vmid}...")
             create_data = ContainerCreate(
                 node=node,
-                vmid=int(vmid), 
+                vmid=int(vmid),
                 ostemplate=data.ostemplate,
                 hostname=data.hostname,
                 password=data.password,
@@ -321,7 +317,7 @@ class ProxmoxService:
                 swap=data.swap,
                 storage=data.storage,
                 disk_size=data.disk_size,
-                network=NetworkInterface(**data.network.model_dump()), 
+                network=NetworkInterface(**data.network.model_dump()),
                 nesting=data.nesting,
                 unprivileged=data.unprivileged,
                 start=data.start,
@@ -342,7 +338,6 @@ class ProxmoxService:
                     'success': False,
                     'message': f"重建失败 (创建步骤): {create_result['message']}"
                 }
-
         except Exception as e:
             logger.error(f"重建容器 {vmid} 失败: {str(e)}")
             return {
@@ -361,8 +356,8 @@ class ProxmoxService:
                     'ticket': console_info['ticket'],
                     'port': console_info['port'],
                     'user': console_info['user'],
-                    'node': node, 
-                    'host': settings.proxmox_host 
+                    'node': node,
+                    'host': settings.proxmox_host
                 }
             }
         except Exception as e:
@@ -383,7 +378,7 @@ class ProxmoxService:
                 'id': task.get('id'),
                 'starttime': task.get('starttime'),
                 'endtime': task.get('endtime'),
-                'upid': task.get('upid') 
+                'upid': task.get('upid')
             }
         except Exception as e:
             logger.error(f"获取任务 {task_id} 状态失败: {str(e)}")
@@ -399,7 +394,7 @@ class ProxmoxService:
             storages = self._do_request(self.proxmox.nodes(node).storage.get)
             templates = []
             for storage in storages:
-                if 'vztmpl' in storage.get('content', ''): 
+                if 'vztmpl' in storage.get('content', ''):
                     content_func = self.proxmox.nodes(node).storage(storage['storage']).content.get
                     content = self._do_request(content_func, content='vztmpl')
                     templates.extend(content)
