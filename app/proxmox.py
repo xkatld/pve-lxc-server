@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import logging
 import urllib3
 import time
+import ipaddress
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -98,6 +99,47 @@ class ProxmoxService:
         except Exception as e:
             logger.error(f"获取容器 {vmid} 状态失败: {str(e)}")
             raise Exception(f"获取容器状态失败: {str(e)}")
+
+    def get_container_ip(self, node: str, vmid: str, interface_name: str = "eth0") -> Optional[str]:
+        try:
+            config = self._call_proxmox_api(self.proxmox.nodes(node).lxc(vmid).config.get)
+            for key, value in config.items():
+                if key.startswith("net") and isinstance(value, str):
+                    net_details = {}
+                    parts = value.split(',')
+                    for part in parts:
+                        if '=' in part:
+                            k, v = part.split('=', 1)
+                            net_details[k.strip()] = v.strip()
+                    
+                    if net_details.get("name") == interface_name:
+                        if "ip" in net_details:
+                            ip_config = net_details["ip"]
+                            if ip_config.lower() == "dhcp":
+
+                                current_status = self._call_proxmox_api(self.proxmox.nodes(node).lxc(vmid).status.current.get)
+                                if current_status.get("status") != "running":
+                                    logger.warning(f"容器 {vmid} ({node}) 未运行，无法通过 agent 获取DHCP IP。")
+                                    return None
+                                try:
+                                    interfaces_info = self._call_proxmox_api(self.proxmox.nodes(node).lxc(vmid).agent.get("network-get-interfaces"))
+                                    if interfaces_info and "result" in interfaces_info:
+                                        for iface in interfaces_info["result"]:
+                                            if iface.get("name") == interface_name and "ip-addresses" in iface:
+                                                for ip_info in iface["ip-addresses"]:
+                                                    if ip_info.get("ip-address-type") == "ipv4":
+                                                        return str(ipaddress.ip_address(ip_info["ip-address"]))
+                                except Exception as agent_e:
+                                    logger.warning(f"通过 agent 获取容器 {vmid} IP 地址失败: {agent_e}")
+                                return None # DHCP, but couldn't get from agent
+                            else: # Static IP
+                                ip_with_cidr = ip_config.split('/')[0]
+                                return str(ipaddress.ip_address(ip_with_cidr))
+            return None
+        except Exception as e:
+            logger.error(f"获取容器 {vmid} ({node}) IP 地址失败: {str(e)}")
+            return None
+
 
     def start_container(self, node: str, vmid: str) -> Dict[str, Any]:
         try:
