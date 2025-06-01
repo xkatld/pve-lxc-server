@@ -1,9 +1,10 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, IPvAnyAddress
 from typing import Optional, Dict, Any, List
 from enum import Enum
+import datetime
 
 class ConsoleMode(str, Enum):
-    DEFAULT_TTY = "默认 (tty)"
+    DEFAULT_TTY = "tty"
     SHELL = "shell"
 
 class ContainerStatus(BaseModel):
@@ -110,3 +111,43 @@ class NodeListResponse(BaseModel):
     success: bool
     message: str
     data: Optional[List[NodeInfo]] = None
+
+class NatRuleBase(BaseModel):
+    host_port: int = Field(..., gt=0, le=65535, description="主机端口")
+    container_port: int = Field(..., gt=0, le=65535, description="容器端口")
+    protocol: str = Field(..., pattern="^(tcp|udp)$", description="协议 (tcp 或 udp)")
+    description: Optional[str] = Field(None, max_length=255, description="规则描述")
+
+class NatRuleCreate(NatRuleBase):
+    pass
+
+class NatRuleUpdate(BaseModel):
+    host_port: Optional[int] = Field(None, gt=0, le=65535, description="主机端口")
+    container_port: Optional[int] = Field(None, gt=0, le=65535, description="容器端口")
+    protocol: Optional[str] = Field(None, pattern="^(tcp|udp)$", description="协议 (tcp 或 udp)")
+    description: Optional[str] = Field(None, max_length=255, description="规则描述")
+    enabled: Optional[bool] = Field(None, description="是否启用规则")
+
+
+class NatRuleDisplay(NatRuleBase):
+    id: int
+    node: str
+    vmid: int
+    container_ip_at_creation: str
+    enabled: bool
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+class NatRuleResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[NatRuleDisplay] = None
+
+class NatRuleListResponse(BaseModel):
+    success: bool
+    message: str
+    data: List[NatRuleDisplay]
+    total: int
